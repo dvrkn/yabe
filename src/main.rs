@@ -216,6 +216,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 emitter.dump(diff_yaml)?;
             }
             let diff_filename = format!("diff{}.yaml", i + 1);
+            out_str = out_str.trim_start_matches("---\n").to_string();
+            out_str.push('\n');
             fs::write(&diff_filename, out_str)?;
             println!("Difference for {} written to {}", input_filenames[i], diff_filename);
         }
