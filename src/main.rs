@@ -29,6 +29,10 @@ struct Args {
     /// Enable debug logging
     #[arg(long = "debug")]
     debug: bool,
+
+    /// Quorum percentage (0-100)
+    #[arg(short = 'q', long = "quorum", default_value_t = 50)]
+    quorum: u8,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -47,6 +51,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // List of input YAML filenames from command-line arguments
     let input_filenames = args.input_files;
+
+    // Compute the quorum percentage from the command-line argument
+    let quorum_percentage = (args.quorum as f64) / 100.0;
 
     // Read and parse the helm chart values file if provided
     let helm_values = if let Some(ref helm_filename) = args.helm_values {
@@ -95,8 +102,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Now compute common base and per-file diffs among the diffs
     let diffs_refs: Vec<&Yaml> = diffs.iter().map(|cow| cow.as_ref()).collect();
-    info!("Computing common base and per-file diffs among the diffs.");
-    let (base, per_file_diffs) = diff_and_common_multiple(&diffs_refs, None);
+    info!(
+        "Computing common base and per-file diffs among the diffs with quorum {}%.",
+        args.quorum
+    );
+    let (base, per_file_diffs) = diff_and_common_multiple(&diffs_refs, quorum_percentage);
 
     // Write the base YAML file if it exists
     if let Some(base_yaml) = base {
