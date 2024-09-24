@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::fs;
 use std::collections::HashSet;
 use std::error::Error;
+use std::path::Path;
 use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
 use yaml_rust2::yaml::Hash;
 
@@ -225,8 +226,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Now objs is a Vec<&Yaml> with extended lifetimes
     let (base, diffs) = diff_and_common_multiple(&objs);
 
-    // Rest of the code remains the same...
-
     // Write the base YAML file if it exists
     if let Some(base_yaml) = base {
         let mut out_str = String::new();
@@ -248,7 +247,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let mut emitter = YamlEmitter::new(&mut out_str);
                 emitter.dump(&diff_yaml)?;
             }
-            let diff_filename = format!("diff{}.yaml", i + 1);
+            // Extract the base name of the input file
+            let input_path = Path::new(&input_filenames[i]);
+            let file_stem = input_path.file_stem().and_then(|s| s.to_str()).unwrap_or("diff");
+            // Create the diff filename by appending '_diff.yaml'
+            let diff_filename = format!("{}_diff.yaml", file_stem);
             out_str = out_str.trim_start_matches("---\n").to_string();
             out_str.push('\n');
             fs::write(&diff_filename, out_str)?;
