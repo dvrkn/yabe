@@ -12,23 +12,6 @@ This project provides a command-line tool written in Rust for computing the diff
 - **Debug Logging**: Provides detailed debug logging to understand the processing steps.
 - **Recursive Comparison**: Handles complex nested structures in YAML files.
 
-## Installation
-
-### Prerequisites
-
-- **Rust Toolchain**: Ensure you have Rust installed. You can install it from [rustup.rs](https://rustup.rs/).
-
-### Build the Project
-
-Clone the repository and build the project using Cargo:
-
-```bash
-git clone https://github.com/dvrkn/yaml-base-extractor.git
-cd yaml-base-extractor
-cargo build --release
-```
-This will create an executable in the target/release directory.
-
 ## Usage
 
 **Command-Line Arguments**
