@@ -33,6 +33,10 @@ struct Args {
     /// Quorum percentage (0-100)
     #[arg(short = 'q', long = "quorum", default_value_t = 50)]
     quorum: u8,
+
+    /// Quorum percentage (0-100)
+    #[arg(long = "base-out-path", default_value = "./base.yaml")]
+    base_out_path: String,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -54,6 +58,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Compute the quorum percentage from the command-line argument
     let quorum_percentage = (args.quorum as f64) / 100.0;
+
+    // Get base output path
+    let base_out_path = args.base_out_path;
 
     // Read and parse the helm chart values file if provided
     let helm_values = if let Some(ref helm_filename) = args.helm_values {
@@ -110,7 +117,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Write the base YAML file if it exists
     if let Some(base_yaml) = base {
-        info!("Writing base YAML to base.yaml");
+        info!("Writing base YAML to {}", base_out_path);
         let mut out_str = String::new();
         {
             let mut emitter = YamlEmitter::new(&mut out_str);
@@ -118,8 +125,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         out_str = out_str.trim_start_matches("---\n").to_string();
         out_str.push('\n');
-        fs::write("base.yaml", out_str)?;
-        println!("Base YAML written to base.yaml");
+        fs::write(base_out_path.as_str(), out_str)?;
+        println!("Base YAML written to {}", base_out_path);
     } else {
         info!("No base YAML to write.");
     }

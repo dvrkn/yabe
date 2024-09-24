@@ -1,7 +1,6 @@
-use std::hash::Hash;
 use yabe::diff::{compute_diff, diff_and_common_multiple};
 use yabe::deep_equal::deep_equal;
-use yaml_rust2::{Yaml, YamlLoader};
+use yaml_rust2::{YamlLoader};
 
 #[test]
 fn test_compute_diff_identical() {
@@ -259,9 +258,6 @@ fn test_quorum_0_percent() {
 
     // Since quorum is 0%, any value is acceptable as base
     assert!(base.is_some());
-    let base_yaml = base.unwrap();
-    let type_of_base = std::any::type_name::<Yaml>();
-    assert_eq!(type_of_base, "yaml_rust2::yaml::Yaml");
 
     // One random value should be in the base, and the rest should be in diffs
     let filtered_diffs = diffs.iter().filter(|x| x.is_some()).collect::<Vec<_>>();
