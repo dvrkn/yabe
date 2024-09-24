@@ -43,27 +43,34 @@ fn test_different_types_same_key() {
 
 #[test]
 fn test_null_values() {
-    let yaml1 = YamlLoader::load_from_str("a: null").unwrap()[0].clone();
-    let yaml2 = YamlLoader::load_from_str("a: value").unwrap()[0].clone();
+    let yaml1 = YamlLoader::load_from_str("key: null").unwrap()[0].clone();
+    let yaml2 = YamlLoader::load_from_str("key: null").unwrap()[0].clone();
+    let yaml3 = YamlLoader::load_from_str("key: value").unwrap()[0].clone();
+    let objs = vec![&yaml1, &yaml2, &yaml3];
 
-    let diff = compute_diff(&yaml1, &yaml2).unwrap();
-    let expected_diff = YamlLoader::load_from_str("a: null").unwrap()[0].clone();
+    let quorum_percentage = 0.66; // 66%
+    let (base, diffs) = diff_and_common_multiple(&objs, quorum_percentage);
 
-    assert!(deep_equal(&diff, &expected_diff));
-
-    let objs = vec![&yaml1, &yaml2];
-    let (base, diffs) = diff_and_common_multiple(&objs, 0.51);
-
+    // Expected base
+    let expected_base_str = "key: null";
+    let expected_base = YamlLoader::load_from_str(expected_base_str).unwrap()[0].clone();
     assert!(base.is_none());
 
+    // Expected diffs
     let expected_diffs = vec![
-        YamlLoader::load_from_str("a: null").unwrap()[0].clone(),
-        YamlLoader::load_from_str("a: value").unwrap()[0].clone(),
+        None, // yaml1 matches the base
+        None, // yaml2 matches the base
+        Some(YamlLoader::load_from_str("key: value").unwrap()[0].clone()),
     ];
 
     for (diff, expected_diff) in diffs.iter().zip(expected_diffs.iter()) {
-        assert!(diff.is_some());
-        assert!(deep_equal(diff.as_ref().unwrap(), expected_diff));
+        match expected_diff {
+            Some(expected) => {
+                assert!(diff.is_some());
+                assert!(deep_equal(diff.as_ref().unwrap(), expected));
+            }
+            None => assert!(diff.is_none()),
+        }
     }
 }
 
@@ -85,4 +92,33 @@ fn test_quorum_base_determination() {
     assert!(diffs[2].is_some());
     let expected_diff = YamlLoader::load_from_str("key: value2").unwrap()[0].clone();
     assert!(deep_equal(diffs[2].as_ref().unwrap(), &expected_diff));
+}
+
+#[test]
+fn test_recursive_diff_with_nested_structures() {
+    let yaml1 = YamlLoader::load_from_str("a:\n  b:\n    c: 1\n    f: 2").unwrap()[0].clone();
+    let yaml2 = YamlLoader::load_from_str("a:\n  b:\n    c: 1\n    e: 2").unwrap()[0].clone();
+    let yaml3 = YamlLoader::load_from_str("a:\n  b:\n    c: 1\n    d: 2").unwrap()[0].clone();
+    let objs = vec![&yaml1, &yaml2, &yaml3];
+
+    let quorum_percentage = 0.51;
+    let (base, diffs) = diff_and_common_multiple(&objs, quorum_percentage);
+
+    // Expected base
+    let expected_base_str = "a:\n  b:\n    c: 1";
+    let expected_base = YamlLoader::load_from_str(expected_base_str).unwrap()[0].clone();
+    assert!(base.is_some());
+    assert!(deep_equal(&base.unwrap(), &expected_base));
+
+    // Expected diffs
+    let expected_diffs_strs = vec![
+        "a:\n  b:\n    f: 2",
+        "a:\n  b:\n    e: 2",
+        "a:\n  b:\n    d: 2",
+    ];
+    for (diff, expected_diff_str) in diffs.iter().zip(expected_diffs_strs.iter()) {
+        let expected_diff = YamlLoader::load_from_str(expected_diff_str).unwrap()[0].clone();
+        assert!(diff.is_some());
+        assert!(deep_equal(diff.as_ref().unwrap(), &expected_diff));
+    }
 }

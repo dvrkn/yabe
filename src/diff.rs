@@ -50,11 +50,13 @@ pub fn compute_diff<'a>(obj: &'a Yaml, helm: &'a Yaml) -> Option<Cow<'a, Yaml>> 
         }
     }
 }
+
 /// Recursively computes the common base and differences among multiple Yaml objects.
 pub fn diff_and_common_multiple<'a>(
     objs: &'a [&'a Yaml],
     quorum: f64,
 ) -> (Option<Cow<'a, Yaml>>, Vec<Option<Cow<'a, Yaml>>>) {
+
     debug!(
         "diff_and_common_multiple called with {} objects and quorum {}%.",
         objs.len(),
@@ -88,10 +90,12 @@ pub fn diff_and_common_multiple<'a>(
 
     // If types differ, include them in diffs
     if type_set.len() > 1 {
-        debug!("Types differ. Including entire values in diffs.");
+        debug!("Types differ. Including non-null values in diffs.");
         return (
             None,
-            objs.iter().map(|obj| Some(Cow::Borrowed(*obj))).collect(),
+            objs.iter()
+                .map(|obj| if obj.is_null() { None } else { Some(Cow::Borrowed(*obj)) })
+                .collect(),
         );
     }
 
@@ -130,11 +134,13 @@ pub fn diff_and_common_multiple<'a>(
                 .collect();
             return (Some(Cow::Borrowed(base_val)), diffs);
         } else {
-            // No value meets the quorum; treat all as diffs
-            debug!("No value meets the quorum; including all in diffs.");
+            // No value meets the quorum; include non-null values in diffs
+            debug!("No value meets the quorum; including non-null values in diffs.");
             return (
                 None,
-                objs.iter().map(|obj| Some(Cow::Borrowed(*obj))).collect(),
+                objs.iter()
+                    .map(|obj| if obj.is_null() { None } else { Some(Cow::Borrowed(*obj)) })
+                    .collect(),
             );
         }
     }
@@ -142,7 +148,6 @@ pub fn diff_and_common_multiple<'a>(
     // Handle hashes (maps)
     if obj_type == "hash" {
         debug!("Handling hashes (maps).");
-        debug!("Collecting all unique keys.");
         // Collect all unique keys
         let mut all_keys = HashSet::new();
         for obj in objs {
@@ -154,8 +159,8 @@ pub fn diff_and_common_multiple<'a>(
         }
 
         // Initialize base hash and diffs
-        let mut base_hash = Hash::with_capacity(all_keys.len());
-        let mut diffs: Vec<Hash> = vec![Hash::with_capacity(all_keys.len()); objs.len()];
+        let mut base_hash = Hash::new();
+        let mut diffs: Vec<Hash> = vec![Hash::new(); objs.len()];
         let mut has_base = false;
         let mut has_diffs = vec![false; objs.len()];
 
@@ -175,69 +180,30 @@ pub fn diff_and_common_multiple<'a>(
                 })
                 .collect();
 
-            debug!("Values at key: {:?}", values_at_key);
+            // Recursively process the values at this key
+            let (sub_base, sub_diffs) = diff_and_common_multiple(&values_at_key, quorum);
 
-            // Count occurrences of each value at this key
-            let mut occurrences = HashMap::new();
-            for val in &values_at_key {
-                *occurrences.entry(*val).or_insert(0) += 1;
+            if let Some(sub_base_val) = sub_base {
+                // Base value meets quorum
+                base_hash.insert((*key).clone(), sub_base_val.into_owned());
+                has_base = true;
             }
 
-            // Find the value(s) that meet the quorum
-            let mut base_value = None;
-            for (val, count) in &occurrences {
-                if *count >= quorum_count {
-                    base_value = Some(*val);
-                    break;
-                }
-            }
-
-            if let Some(base_val) = base_value {
-                debug!(
-                    "Base value at key {:?} determined by quorum: {:?}",
-                    key, base_val
-                );
-
-                // Recursively compute diffs for values that differ from base_val
-                let mut sub_diffs = vec![];
-                for (i, val) in values_at_key.iter().enumerate() {
-                    if deep_equal(val, base_val) {
-                        sub_diffs.push(None);
-                    } else {
-                        sub_diffs.push(Some(Cow::Borrowed(*val)));
+            for (i, sub_diff) in sub_diffs.into_iter().enumerate() {
+                if let Some(sub_diff_val) = sub_diff {
+                    // Only include non-null diffs
+                    if !sub_diff_val.is_null() {
+                        diffs[i].insert((*key).clone(), sub_diff_val.into_owned());
                         has_diffs[i] = true;
                     }
-                }
-
-                // Add base value
-                base_hash.insert((*key).clone(), base_val.clone());
-                has_base = true;
-
-                // Add to diffs
-                for (i, sub_diff) in sub_diffs.into_iter().enumerate() {
-                    if let Some(sub_diff_val) = sub_diff {
-                        diffs[i].insert((*key).clone(), sub_diff_val.into_owned());
-                    }
-                }
-            } else {
-                // No value meets quorum; treat all values at this key as diffs
-                debug!(
-                    "No value at key {:?} meets quorum; including all in diffs.",
-                    key
-                );
-                has_diffs.iter_mut().for_each(|d| *d = true);
-                for (i, val) in values_at_key.iter().enumerate() {
-                    diffs[i].insert((*key).clone(), (*val).clone());
                 }
             }
         }
 
         // Prepare base and diffs for return
         let base = if has_base {
-            debug!("Base hash constructed.");
             Some(Cow::Owned(Yaml::Hash(base_hash)))
         } else {
-            debug!("No base hash constructed.");
             None
         };
 
