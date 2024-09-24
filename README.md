@@ -76,7 +76,7 @@ Use the --debug flag to enable detailed debug logging:
 
 ### Sample Input Files
 
-helm_values.yaml
+_helm_values.yaml_
 ```yaml
 settings:
   theme: dark
@@ -86,7 +86,7 @@ settings:
     level: 5
 ```
 
-file1.yaml
+_file1.yaml_
 ```yaml
 settings:
   theme: dark
@@ -96,7 +96,7 @@ settings:
     level: 5
 ```
 
-file2.yaml
+_file2.yaml_
 ```yaml
 settings:
   theme: light
@@ -106,7 +106,7 @@ settings:
     level: 5
 ```
 
-file3.yaml
+_file3.yaml_
 ```yaml
 settings:
   theme: dark
@@ -123,17 +123,17 @@ settings:
 ```
 
 ### Expected Output
-base.yaml
+_base.yaml_
 ```yaml
 settings:
   advanced:
     level: 5
 ```
 
-file1_diff.yaml
+_file1_diff.yaml_
 (Empty file or not generated since there are no differences)
 
-file2_diff.yaml
+_file2_diff.yaml_
 ```yaml
 settings:
   theme: light
@@ -141,7 +141,7 @@ settings:
     mode: manual
 ```
 
-file3_diff.yaml
+_file3_diff.yaml_
 ```yaml
 settings:
   notifications: false
