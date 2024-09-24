@@ -4,8 +4,8 @@ use yaml_rust2::{YamlLoader, Yaml};
 
 #[test]
 fn test_empty_documents() {
-    let yaml1 = YamlLoader::load_from_str("").unwrap_or_default().get(0).cloned().unwrap_or(Yaml::Null);
-    let yaml2 = YamlLoader::load_from_str("").unwrap_or_default().get(0).cloned().unwrap_or(Yaml::Null);
+    let yaml1 = YamlLoader::load_from_str("").unwrap_or_default().first().cloned().unwrap_or(Yaml::Null);
+    let yaml2 = YamlLoader::load_from_str("").unwrap_or_default().first().cloned().unwrap_or(Yaml::Null);
 
     assert!(deep_equal(&yaml1, &yaml2));
 
@@ -30,9 +30,9 @@ fn test_different_types_same_key() {
 
     assert!(base.is_none());
 
-    let expected_diffs = vec![
+    let expected_diffs = [
         YamlLoader::load_from_str("key: value").unwrap()[0].clone(),
-        YamlLoader::load_from_str("key:\n  subkey: value").unwrap()[0].clone(),
+        YamlLoader::load_from_str("key:\n  subkey: value").unwrap()[0].clone()
     ];
 
     for (diff, expected_diff) in diffs.iter().zip(expected_diffs.iter()) {
@@ -50,17 +50,13 @@ fn test_null_values() {
 
     let quorum_percentage = 0.66; // 66%
     let (base, diffs) = diff_and_common_multiple(&objs, quorum_percentage);
-
-    // Expected base
-    let expected_base_str = "key: null";
-    let expected_base = YamlLoader::load_from_str(expected_base_str).unwrap()[0].clone();
     assert!(base.is_none());
 
     // Expected diffs
-    let expected_diffs = vec![
+    let expected_diffs = [
         None, // yaml1 matches the base
         None, // yaml2 matches the base
-        Some(YamlLoader::load_from_str("key: value").unwrap()[0].clone()),
+        Some(YamlLoader::load_from_str("key: value").unwrap()[0].clone())
     ];
 
     for (diff, expected_diff) in diffs.iter().zip(expected_diffs.iter()) {
@@ -111,10 +107,10 @@ fn test_recursive_diff_with_nested_structures() {
     assert!(deep_equal(&base.unwrap(), &expected_base));
 
     // Expected diffs
-    let expected_diffs_strs = vec![
+    let expected_diffs_strs = [
         "a:\n  b:\n    f: 2",
         "a:\n  b:\n    e: 2",
-        "a:\n  b:\n    d: 2",
+        "a:\n  b:\n    d: 2"
     ];
     for (diff, expected_diff_str) in diffs.iter().zip(expected_diffs_strs.iter()) {
         let expected_diff = YamlLoader::load_from_str(expected_diff_str).unwrap()[0].clone();

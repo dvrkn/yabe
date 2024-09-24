@@ -93,9 +93,9 @@ fn test_diff_and_common_multiple_different() {
     let expected_base = YamlLoader::load_from_str("a: 1").unwrap()[0].clone();
     assert!(deep_equal(&base.unwrap(), &expected_base));
 
-    let expected_diffs = vec![
+    let expected_diffs = [
         YamlLoader::load_from_str("b: 2").unwrap()[0].clone(),
-        YamlLoader::load_from_str("b: 3").unwrap()[0].clone(),
+        YamlLoader::load_from_str("b: 3").unwrap()[0].clone()
     ];
 
     for (diff, expected_diff) in diffs.iter().zip(expected_diffs.iter()) {
@@ -118,10 +118,10 @@ fn test_diff_and_common_multiple_three_files_quorum_66() {
     let expected_base = YamlLoader::load_from_str("a: 1\nb: 2\nc: 3").unwrap()[0].clone();
     assert!(deep_equal(&base.unwrap(), &expected_base));
 
-    let expected_diffs = vec![
+    let expected_diffs = [
         None, // yaml1 matches the base
         Some(YamlLoader::load_from_str("c: 4").unwrap()[0].clone()),
-        Some(YamlLoader::load_from_str("b: 5").unwrap()[0].clone()),
+        Some(YamlLoader::load_from_str("b: 5").unwrap()[0].clone())
     ];
 
     for (diff, expected_diff) in diffs.iter().zip(expected_diffs.iter()) {
@@ -146,9 +146,9 @@ fn test_diff_and_common_multiple_arrays() {
     // Since arrays differ, base is None
     assert!(base.is_none());
 
-    let expected_diffs = vec![
+    let expected_diffs = [
         YamlLoader::load_from_str("items:\n  - a\n  - b").unwrap()[0].clone(),
-        YamlLoader::load_from_str("items:\n  - a\n  - c").unwrap()[0].clone(),
+        YamlLoader::load_from_str("items:\n  - a\n  - c").unwrap()[0].clone()
     ];
 
     for (diff, expected_diff) in diffs.iter().zip(expected_diffs.iter()) {
@@ -173,10 +173,10 @@ fn test_quorum_100_percent() {
     assert!(deep_equal(&base.unwrap(), &expected_base));
 
     // Diffs should contain deviations in key2
-    let expected_diffs = vec![
+    let expected_diffs = [
         YamlLoader::load_from_str("key2: value2").unwrap()[0].clone(),
         YamlLoader::load_from_str("key2: value3").unwrap()[0].clone(),
-        YamlLoader::load_from_str("key2: value2").unwrap()[0].clone(),
+        YamlLoader::load_from_str("key2: value2").unwrap()[0].clone()
     ];
 
     for (diff, expected_diff) in diffs.iter().zip(expected_diffs.iter()) {
@@ -201,10 +201,10 @@ fn test_quorum_66_percent() {
     assert!(deep_equal(&base.unwrap(), &expected_base));
 
     // Diffs should contain deviations in key2 for yaml2
-    let expected_diffs = vec![
+    let expected_diffs = [
         None, // yaml1 matches the base
         Some(YamlLoader::load_from_str("key2: value2").unwrap()[0].clone()),
-        None, // yaml3 matches the base
+        None
     ];
 
     for (diff, expected_diff) in diffs.iter().zip(expected_diffs.iter()) {
@@ -234,10 +234,10 @@ fn test_quorum_50_percent() {
     assert!(deep_equal(&base.unwrap(), &expected_base));
 
     // Diffs should contain deviations in key2 for each file
-    let expected_diffs = vec![
+    let expected_diffs = [
         YamlLoader::load_from_str("key2: value1").unwrap()[0].clone(),
         YamlLoader::load_from_str("key2: value2").unwrap()[0].clone(),
-        YamlLoader::load_from_str("key2: value3").unwrap()[0].clone(),
+        YamlLoader::load_from_str("key2: value3").unwrap()[0].clone()
     ];
 
     for (diff, expected_diff) in diffs.iter().zip(expected_diffs.iter()) {
@@ -280,10 +280,10 @@ fn test_quorum_edge_case_high_quorum() {
     assert!(deep_equal(&base.unwrap(), &expected_base));
 
     // Diffs should include key1 for each file
-    let expected_diffs = vec![
+    let expected_diffs = [
         YamlLoader::load_from_str("key1: value1").unwrap()[0].clone(),
         YamlLoader::load_from_str("key1: value2").unwrap()[0].clone(),
-        YamlLoader::load_from_str("key1: value3").unwrap()[0].clone(),
+        YamlLoader::load_from_str("key1: value3").unwrap()[0].clone()
     ];
 
     for (diff, expected_diff) in diffs.iter().zip(expected_diffs.iter()) {

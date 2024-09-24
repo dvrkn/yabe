@@ -4,7 +4,6 @@ use std::fs;
 use std::path::Path;
 
 use clap::Parser;
-use env_logger;
 use log::{info, warn};
 use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
 
@@ -126,7 +125,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         out_str = out_str.trim_start_matches("---\n").to_string();
         out_str.push('\n');
         fs::write(base_out_path.as_str(), out_str)?;
-        println!("Base YAML written to {}", base_out_path);
+        info!("Base YAML written to {}", base_out_path);
     } else {
         info!("No base YAML to write.");
     }
@@ -141,12 +140,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let mut out_str = String::new();
                 {
                     let mut emitter = YamlEmitter::new(&mut out_str);
-                    emitter.dump(&diff_yaml)?;
+                    emitter.dump(diff_yaml)?;
                 }
                 out_str = out_str.trim_start_matches("---\n").to_string();
                 out_str.push('\n');
                 fs::write(&input_filenames[i], out_str)?;
-                println!(
+                info!(
                     "Difference written back to original file {}",
                     input_filenames[i]
                 );
@@ -154,7 +153,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 // If there is no diff, remove the content of the file
                 info!("No diff for {}; clearing file content.", input_filenames[i]);
                 fs::write(&input_filenames[i], "")?;
-                println!(
+                info!(
                     "No difference for {}; file content cleared.",
                     input_filenames[i]
                 );
@@ -169,7 +168,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let mut out_str = String::new();
                 {
                     let mut emitter = YamlEmitter::new(&mut out_str);
-                    emitter.dump(&diff_yaml)?;
+                    emitter.dump(diff_yaml)?;
                 }
                 // Extract the base name of the input file
                 let input_path = Path::new(&input_filenames[i]);
@@ -182,7 +181,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 out_str = out_str.trim_start_matches("---\n").to_string();
                 out_str.push('\n');
                 fs::write(&diff_filename, out_str)?;
-                println!(
+                info!(
                     "Difference for {} written to {}",
                     input_filenames[i], diff_filename
                 );
