@@ -43,6 +43,7 @@ Options:
   -i, --inplace                  Modify the original input files with diffs
       --debug                    Enable debug logging
   -q, --quorum <QUORUM>          Quorum percentage (0-100) [default: 50]
+      --base-out-path <BASE_OUT_PATH>  Quorum percentage (0-100) [default: ./base.yaml]
   -h, --help                     Print help information
   -V, --version                  Print version information
 ```
