@@ -1,231 +1,80 @@
-use std::borrow::Cow;
-use std::collections::HashSet;
 use std::error::Error;
 use std::fs;
 use std::path::Path;
-use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
-use yaml_rust2::yaml::Hash;
-use clap::Parser;
 
+use clap::Parser;
+use env_logger;
+use log::{info, warn};
+use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
+
+mod diff;
+
+use diff::{compute_diff, diff_and_common_multiple};
 
 /// Command-line arguments
-#[derive(clap::Parser)]
+#[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Modify the original input files with diffs
-    #[arg(short, long)]
-    inplace: bool,
+    /// Helm chart values file
+    #[arg(short = 'h', long = "helm", value_name = "HELM_VALUES_FILE")]
+    helm_values: Option<String>,
 
     /// Input YAML files
     #[arg(required = true)]
     input_files: Vec<String>,
 
-}
+    /// Modify the original input files with diffs
+    #[arg(short = 'i', long = "inplace")]
+    inplace: bool,
 
-/// Recursively checks if two Yaml values are deeply equal.
-fn deep_equal(a: &Yaml, b: &Yaml) -> bool {
-    match (a, b) {
-        (Yaml::Real(a_str), Yaml::Real(b_str)) => a_str == b_str,
-        (Yaml::Integer(a_int), Yaml::Integer(b_int)) => a_int == b_int,
-        (Yaml::String(a_str), Yaml::String(b_str)) => a_str == b_str,
-        (Yaml::Boolean(a_bool), Yaml::Boolean(b_bool)) => a_bool == b_bool,
-        (Yaml::Array(a_vec), Yaml::Array(b_vec)) => {
-            if a_vec.len() != b_vec.len() {
-                false
-            } else {
-                for (a_item, b_item) in a_vec.iter().zip(b_vec.iter()) {
-                    if !deep_equal(a_item, b_item) {
-                        return false;
-                    }
-                }
-                true
-            }
-        }
-        (Yaml::Hash(a_hash), Yaml::Hash(b_hash)) => {
-            if a_hash.len() != b_hash.len() {
-                false
-            } else {
-                for (a_key, a_value) in a_hash.iter() {
-                    if let Some(b_value) = b_hash.get(a_key) {
-                        if !deep_equal(a_value, b_value) {
-                            return false;
-                        }
-                    } else {
-                        return false;
-                    }
-                }
-                true
-            }
-        }
-        (Yaml::Null, Yaml::Null) => true,
-        _ => false,
-    }
-}
-
-/// Recursively computes the common base and differences among multiple Yaml objects.
-fn diff_and_common_multiple<'a>(
-    objs: &'a [&'a Yaml],
-) -> (Option<Cow<'a, Yaml>>, Vec<Option<Cow<'a, Yaml>>>) {
-    if objs.is_empty() {
-        return (None, vec![]);
-    }
-
-    // Check if all objects are deeply equal
-    if objs.iter().all(|val| deep_equal(val, objs[0])) {
-        // Return a reference to the common object
-        return (Some(Cow::Borrowed(objs[0])), vec![None; objs.len()]);
-    }
-
-    // Collect types of each object
-    let types: Vec<&str> = objs
-        .iter()
-        .map(|obj| match obj {
-            Yaml::Null => "null",
-            Yaml::Boolean(_) => "bool",
-            Yaml::Integer(_) => "int",
-            Yaml::Real(_) => "real",
-            Yaml::String(_) => "string",
-            Yaml::Array(_) => "array",
-            Yaml::Hash(_) => "hash",
-            _ => "unknown",
-        })
-        .collect();
-
-    let type_set: HashSet<&str> = types.iter().cloned().collect();
-
-    // If types differ or any is null, treat entire values as diffs
-    if type_set.len() > 1 || types.contains(&"null") {
-        return (
-            None,
-            objs.iter().map(|obj| Some(Cow::Borrowed(*obj))).collect(),
-        );
-    }
-
-    let obj_type = types[0];
-
-    // Handle primitive types (non-object, non-array)
-    if obj_type != "hash" && obj_type != "array" {
-        // Values differ; include them in diffs
-        return (
-            None,
-            objs.iter().map(|obj| Some(Cow::Borrowed(*obj))).collect(),
-        );
-    }
-
-    // Handle arrays
-    if obj_type == "array" {
-        // Compare arrays as whole units
-        if objs.iter().all(|val| deep_equal(val, objs[0])) {
-            // Arrays are identical; return a reference to the array
-            return (Some(Cow::Borrowed(objs[0])), vec![None; objs.len()]);
-        } else {
-            // Arrays differ; include them in diffs
-            return (
-                None,
-                objs.iter().map(|obj| Some(Cow::Borrowed(*obj))).collect(),
-            );
-        }
-    }
-
-    // Handle hashes (maps)
-    if obj_type == "hash" {
-        // Collect all unique keys
-        let mut all_keys = HashSet::new();
-        for obj in objs {
-            if let Yaml::Hash(ref h) = obj {
-                for key in h.keys() {
-                    all_keys.insert(key);
-                }
-            }
-        }
-
-        // Initialize base hash and diffs
-        let mut base_hash = Hash::new();
-        let mut diffs: Vec<Hash> = vec![Hash::new(); objs.len()];
-        let mut has_base = false;
-        let mut has_diffs = vec![false; objs.len()];
-
-        // Iterate over all keys
-        for key in &all_keys {
-            // Collect values at current key from all objects
-            let values_at_key: Vec<&Yaml> = objs
-                .iter()
-                .map(|obj| {
-                    if let Yaml::Hash(ref h) = obj {
-                        h.get(*key).unwrap_or(&Yaml::Null)
-                    } else {
-                        &Yaml::Null
-                    }
-                })
-                .collect();
-
-            // Recursively compute base and diffs for the current key
-            let (sub_base, sub_diffs) = diff_and_common_multiple(&values_at_key);
-
-            // Add to base if common
-            if let Some(sub_base_val) = sub_base {
-                base_hash.insert((*key).clone(), sub_base_val.into_owned());
-                has_base = true;
-            }
-
-            // Add to diffs if different
-            for (i, sub_diff) in sub_diffs.into_iter().enumerate() {
-                if let Some(sub_diff_val) = sub_diff {
-                    diffs[i].insert((*key).clone(), sub_diff_val.into_owned());
-                    has_diffs[i] = true;
-                }
-            }
-        }
-
-        // Prepare base and diffs for return
-        let base = if has_base {
-            Some(Cow::Owned(Yaml::Hash(base_hash)))
-        } else {
-            None
-        };
-
-        let diffs_result: Vec<Option<Cow<'a, Yaml>>> = diffs
-            .into_iter()
-            .enumerate()
-            .map(|(i, h)| {
-                if has_diffs[i] {
-                    Some(Cow::Owned(Yaml::Hash(h)))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        return (base, diffs_result);
-    }
-
-    // Should not reach here; treat as diffs
-    (
-        None,
-        objs.iter().map(|obj| Some(Cow::Borrowed(*obj))).collect(),
-    )
+    /// Enable debug logging
+    #[arg(long = "debug")]
+    debug: bool,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Parse command-line arguments
     let args = Args::parse();
 
+    // Initialize the logger
+    if args.debug {
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
+    } else {
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    }
+
+    // Log the start of the program
+    info!("Starting the YAML diffing program.");
+
     // List of input YAML filenames from command-line arguments
     let input_filenames = args.input_files;
+
+    // Read and parse the helm chart values file if provided
+    let helm_values = if let Some(ref helm_filename) = args.helm_values {
+        info!("Reading helm values file: {}", helm_filename);
+        let content = fs::read_to_string(helm_filename)?;
+        let docs = YamlLoader::load_from_str(&content)?;
+        if docs.is_empty() {
+            warn!("No YAML documents in helm values file {}", helm_filename);
+            None
+        } else {
+            Some(docs[0].clone())
+        }
+    } else {
+        None
+    };
 
     // Read and parse each YAML file into an object
     let mut all_docs = Vec::new();
     let mut objs = Vec::new();
     for filename in &input_filenames {
-        // Read file content
+        info!("Reading input file: {}", filename);
         let content = fs::read_to_string(filename)?;
-        // Parse YAML documents
         let docs = YamlLoader::load_from_str(&content)?;
         if docs.is_empty() {
-            eprintln!("No YAML documents in {}", filename);
+            warn!("No YAML documents in {}", filename);
             continue; // Skip empty files
         }
-        // Store docs to extend their lifetime
         all_docs.push(docs);
     }
 
@@ -234,11 +83,25 @@ fn main() -> Result<(), Box<dyn Error>> {
         objs.push(&docs[0]);
     }
 
-    // Now objs is a Vec<&Yaml> with extended lifetimes
-    let (base, diffs) = diff_and_common_multiple(&objs);
+    // Compute diffs between each obj and helm values
+    let diffs: Vec<Yaml> = if let Some(helm) = helm_values.as_ref() {
+        info!("Computing diffs between override files and helm values.");
+        objs.iter()
+            .map(|obj| compute_diff(obj, helm).unwrap_or(Yaml::Null))
+            .collect()
+    } else {
+        // No helm values; use objs as diffs
+        objs.iter().map(|obj| (*obj).clone()).collect()
+    };
+
+    // Now compute common base and per-file diffs among the diffs
+    let diffs_refs: Vec<&Yaml> = diffs.iter().collect();
+    info!("Computing common base and per-file diffs among the diffs.");
+    let (base, per_file_diffs) = diff_and_common_multiple(&diffs_refs, None);
 
     // Write the base YAML file if it exists
     if let Some(base_yaml) = base {
+        info!("Writing base YAML to base.yaml");
         let mut out_str = String::new();
         {
             let mut emitter = YamlEmitter::new(&mut out_str);
@@ -248,13 +111,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         out_str.push('\n');
         fs::write("base.yaml", out_str)?;
         println!("Base YAML written to base.yaml");
+    } else {
+        info!("No base YAML to write.");
     }
 
     // Determine whether to write diffs to original files or new files
     if args.inplace {
+        info!("Inplace mode enabled. Modifying original files.");
         // Modify the original input files with the diffs
-        for (i, diff) in diffs.iter().enumerate() {
+        for (i, diff) in per_file_diffs.iter().enumerate() {
             if let Some(diff_yaml) = diff {
+                info!("Writing diff back to original file: {}", input_filenames[i]);
                 let mut out_str = String::new();
                 {
                     let mut emitter = YamlEmitter::new(&mut out_str);
@@ -269,6 +136,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 );
             } else {
                 // If there is no diff, remove the content of the file
+                info!("No diff for {}; clearing file content.", input_filenames[i]);
                 fs::write(&input_filenames[i], "")?;
                 println!(
                     "No difference for {}; file content cleared.",
@@ -277,9 +145,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     } else {
+        info!("Writing diffs to new files.");
         // Write diff files with modified names
-        for (i, diff) in diffs.iter().enumerate() {
+        for (i, diff) in per_file_diffs.iter().enumerate() {
             if let Some(diff_yaml) = diff {
+                info!("Writing diff for {} to new file.", input_filenames[i]);
                 let mut out_str = String::new();
                 {
                     let mut emitter = YamlEmitter::new(&mut out_str);
@@ -300,9 +170,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                     "Difference for {} written to {}",
                     input_filenames[i], diff_filename
                 );
+            } else {
+                info!("No diff for {}; not writing a diff file.", input_filenames[i]);
             }
         }
     }
 
+    info!("Program completed successfully.");
     Ok(())
 }
