@@ -6,51 +6,50 @@ use yaml_rust2::yaml::{Hash, Yaml};
 use crate::deep_equal::deep_equal;
 
 /// Recursively computes the difference between an override YAML object and the helm values YAML object.
-pub fn compute_diff(obj: &Yaml, helm: &Yaml) -> Option<Yaml> {
+pub fn compute_diff<'a>(obj: &'a Yaml, helm: &'a Yaml) -> Option<Cow<'a, Yaml>> {
     if deep_equal(obj, helm) {
         None
     } else {
         match (obj, helm) {
             (Yaml::Hash(obj_hash), Yaml::Hash(helm_hash)) => {
-                let mut diff_hash = Hash::new();
+                let mut diff_hash = Hash::with_capacity(obj_hash.len());
                 for (key, obj_value) in obj_hash {
                     let helm_value = helm_hash.get(key).unwrap_or(&Yaml::Null);
                     if let Some(diff_value) = compute_diff(obj_value, helm_value) {
-                        diff_hash.insert(key.clone(), diff_value);
+                        diff_hash.insert(key.clone(), diff_value.into_owned());
                     }
                 }
                 if diff_hash.is_empty() {
                     None
                 } else {
-                    Some(Yaml::Hash(diff_hash))
+                    Some(Cow::Owned(Yaml::Hash(diff_hash)))
                 }
             }
             (Yaml::Array(obj_array), Yaml::Array(helm_array)) => {
                 if obj_array.len() != helm_array.len() {
-                    Some(obj.clone())
+                    Some(Cow::Borrowed(obj))
                 } else {
-                    let mut diffs = Vec::new();
+                    let mut diffs = Vec::with_capacity(obj_array.len());
                     let mut has_diff = false;
                     for (obj_item, helm_item) in obj_array.iter().zip(helm_array.iter()) {
                         if let Some(diff_item) = compute_diff(obj_item, helm_item) {
-                            diffs.push(diff_item);
+                            diffs.push(diff_item.into_owned());
                             has_diff = true;
                         } else {
                             diffs.push(Yaml::Null);
                         }
                     }
                     if has_diff {
-                        Some(Yaml::Array(diffs))
+                        Some(Cow::Owned(Yaml::Array(diffs)))
                     } else {
                         None
                     }
                 }
             }
-            _ => Some(obj.clone()),
+            _ => Some(Cow::Borrowed(obj)),
         }
     }
 }
-
 /// Recursively computes the common base and differences among multiple Yaml objects.
 pub fn diff_and_common_multiple<'a>(
     objs: &'a [&'a Yaml],
@@ -137,8 +136,8 @@ pub fn diff_and_common_multiple<'a>(
         }
 
         // Initialize base hash and diffs
-        let mut base_hash = Hash::new();
-        let mut diffs: Vec<Hash> = vec![Hash::new(); objs.len()];
+        let mut base_hash = Hash::with_capacity(all_keys.len());
+        let mut diffs: Vec<Hash> = vec![Hash::with_capacity(all_keys.len()); objs.len()];
         let mut has_base = false;
         let mut has_diffs = vec![false; objs.len()];
 

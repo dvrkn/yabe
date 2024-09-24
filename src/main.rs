@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::error::Error;
 use std::fs;
 use std::path::Path;
@@ -6,9 +7,6 @@ use clap::Parser;
 use env_logger;
 use log::{info, warn};
 use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
-
-mod diff;
-mod deep_equal;
 
 use yabe::diff::{compute_diff, diff_and_common_multiple};
 
@@ -85,18 +83,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // Compute diffs between each obj and helm values
-    let diffs: Vec<Yaml> = if let Some(helm) = helm_values.as_ref() {
+    let diffs: Vec<_> = if let Some(helm) = helm_values.as_ref() {
         info!("Computing diffs between override files and helm values.");
         objs.iter()
-            .map(|obj| compute_diff(obj, helm).unwrap_or(Yaml::Null))
+            .map(|obj| compute_diff(obj, helm).unwrap_or_else(|| Cow::Owned(Yaml::Null)))
             .collect()
     } else {
         // No helm values; use objs as diffs
-        objs.iter().map(|obj| (*obj).clone()).collect()
+        objs.iter().map(|obj| Cow::Borrowed(*obj)).collect()
     };
 
     // Now compute common base and per-file diffs among the diffs
-    let diffs_refs: Vec<&Yaml> = diffs.iter().collect();
+    let diffs_refs: Vec<&Yaml> = diffs.iter().map(|cow| cow.as_ref()).collect();
     info!("Computing common base and per-file diffs among the diffs.");
     let (base, per_file_diffs) = diff_and_common_multiple(&diffs_refs, None);
 

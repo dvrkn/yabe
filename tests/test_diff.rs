@@ -1,6 +1,6 @@
 use yabe::diff::{compute_diff, diff_and_common_multiple};
 use yabe::deep_equal::deep_equal;
-use yaml_rust2::{YamlLoader, Yaml};
+use yaml_rust2::{YamlLoader};
 
 #[test]
 fn test_compute_diff_identical() {
