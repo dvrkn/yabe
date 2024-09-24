@@ -8,8 +8,9 @@ use log::{info, warn};
 use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
 
 mod diff;
+mod deep_equal;
 
-use diff::{compute_diff, diff_and_common_multiple};
+use yabe::diff::{compute_diff, diff_and_common_multiple};
 
 /// Command-line arguments
 #[derive(Parser)]

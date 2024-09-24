@@ -3,10 +3,7 @@ use std::collections::HashSet;
 
 use log::debug;
 use yaml_rust2::yaml::{Hash, Yaml};
-
-mod deep_equal;
-
-use deep_equal::deep_equal;
+use crate::deep_equal::deep_equal;
 
 /// Recursively computes the difference between an override YAML object and the helm values YAML object.
 pub fn compute_diff(obj: &Yaml, helm: &Yaml) -> Option<Yaml> {
