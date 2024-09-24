@@ -1,21 +1,34 @@
 use std::borrow::Cow;
-use std::fs;
 use std::collections::HashSet;
 use std::error::Error;
+use std::fs;
 use std::path::Path;
 use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
 use yaml_rust2::yaml::Hash;
+use clap::Parser;
+
+
+/// Command-line arguments
+#[derive(clap::Parser)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Modify the original input files with diffs
+    #[arg(short, long)]
+    inplace: bool,
+
+    /// Input YAML files
+    #[arg(required = true)]
+    input_files: Vec<String>,
+
+}
 
 /// Recursively checks if two Yaml values are deeply equal.
 fn deep_equal(a: &Yaml, b: &Yaml) -> bool {
     match (a, b) {
-        // Compare numbers, strings, booleans directly
         (Yaml::Real(a_str), Yaml::Real(b_str)) => a_str == b_str,
         (Yaml::Integer(a_int), Yaml::Integer(b_int)) => a_int == b_int,
         (Yaml::String(a_str), Yaml::String(b_str)) => a_str == b_str,
         (Yaml::Boolean(a_bool), Yaml::Boolean(b_bool)) => a_bool == b_bool,
-
-        // Compare arrays element-wise
         (Yaml::Array(a_vec), Yaml::Array(b_vec)) => {
             if a_vec.len() != b_vec.len() {
                 false
@@ -27,9 +40,7 @@ fn deep_equal(a: &Yaml, b: &Yaml) -> bool {
                 }
                 true
             }
-        },
-
-        // Compare hashes (maps) by keys and values
+        }
         (Yaml::Hash(a_hash), Yaml::Hash(b_hash)) => {
             if a_hash.len() != b_hash.len() {
                 false
@@ -45,20 +56,16 @@ fn deep_equal(a: &Yaml, b: &Yaml) -> bool {
                 }
                 true
             }
-        },
-
-        // Both are null
+        }
         (Yaml::Null, Yaml::Null) => true,
-
-        // Types differ
         _ => false,
     }
 }
 
+/// Recursively computes the common base and differences among multiple Yaml objects.
 fn diff_and_common_multiple<'a>(
     objs: &'a [&'a Yaml],
-) -> (Option<Cow<'a, Yaml>>, Vec<Option<Cow<'a, Yaml>>>)
-{
+) -> (Option<Cow<'a, Yaml>>, Vec<Option<Cow<'a, Yaml>>>) {
     if objs.is_empty() {
         return (None, vec![]);
     }
@@ -198,9 +205,13 @@ fn diff_and_common_multiple<'a>(
         objs.iter().map(|obj| Some(Cow::Borrowed(*obj))).collect(),
     )
 }
+
 fn main() -> Result<(), Box<dyn Error>> {
-    // List of input YAML filenames
-    let input_filenames = vec!["file1.yaml", "file2.yaml", "file3.yaml"];
+    // Parse command-line arguments
+    let args = Args::parse();
+
+    // List of input YAML filenames from command-line arguments
+    let input_filenames = args.input_files;
 
     // Read and parse each YAML file into an object
     let mut all_docs = Vec::new();
@@ -239,26 +250,57 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("Base YAML written to base.yaml");
     }
 
-    // Write diff files for each input file
-    for (i, diff) in diffs.iter().enumerate() {
-        if let Some(diff_yaml) = diff {
-            let mut out_str = String::new();
-            {
-                let mut emitter = YamlEmitter::new(&mut out_str);
-                emitter.dump(&diff_yaml)?;
+    // Determine whether to write diffs to original files or new files
+    if args.inplace {
+        // Modify the original input files with the diffs
+        for (i, diff) in diffs.iter().enumerate() {
+            if let Some(diff_yaml) = diff {
+                let mut out_str = String::new();
+                {
+                    let mut emitter = YamlEmitter::new(&mut out_str);
+                    emitter.dump(&diff_yaml)?;
+                }
+                out_str = out_str.trim_start_matches("---\n").to_string();
+                out_str.push('\n');
+                fs::write(&input_filenames[i], out_str)?;
+                println!(
+                    "Difference written back to original file {}",
+                    input_filenames[i]
+                );
+            } else {
+                // If there is no diff, remove the content of the file
+                fs::write(&input_filenames[i], "")?;
+                println!(
+                    "No difference for {}; file content cleared.",
+                    input_filenames[i]
+                );
             }
-            // Extract the base name of the input file
-            let input_path = Path::new(&input_filenames[i]);
-            let file_stem = input_path.file_stem().and_then(|s| s.to_str()).unwrap_or("diff");
-            // Create the diff filename by appending '_diff.yaml'
-            let diff_filename = format!("{}_diff.yaml", file_stem);
-            out_str = out_str.trim_start_matches("---\n").to_string();
-            out_str.push('\n');
-            fs::write(&diff_filename, out_str)?;
-            println!(
-                "Difference for {} written to {}",
-                input_filenames[i], diff_filename
-            );
+        }
+    } else {
+        // Write diff files with modified names
+        for (i, diff) in diffs.iter().enumerate() {
+            if let Some(diff_yaml) = diff {
+                let mut out_str = String::new();
+                {
+                    let mut emitter = YamlEmitter::new(&mut out_str);
+                    emitter.dump(&diff_yaml)?;
+                }
+                // Extract the base name of the input file
+                let input_path = Path::new(&input_filenames[i]);
+                let file_stem = input_path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("diff");
+                // Create the diff filename by appending '_diff.yaml'
+                let diff_filename = format!("{}_diff.yaml", file_stem);
+                out_str = out_str.trim_start_matches("---\n").to_string();
+                out_str.push('\n');
+                fs::write(&diff_filename, out_str)?;
+                println!(
+                    "Difference for {} written to {}",
+                    input_filenames[i], diff_filename
+                );
+            }
         }
     }
 

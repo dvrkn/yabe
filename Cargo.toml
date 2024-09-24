@@ -10,5 +10,5 @@ name = "yabe"
 path = "src/main.rs"
 
 [dependencies]
+clap = { version = "4.5.18", features = ["derive"] }
 yaml-rust2 = "0.8.1"
-
