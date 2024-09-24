@@ -42,6 +42,7 @@ Options:
   -h, --helm <HELM_VALUES_FILE>  Helm chart values file
   -i, --inplace                  Modify the original input files with diffs
       --debug                    Enable debug logging
+  -q, --quorum <QUORUM>          Quorum percentage (0-100) [default: 50]
   -h, --help                     Print help information
   -V, --version                  Print version information
 ```
