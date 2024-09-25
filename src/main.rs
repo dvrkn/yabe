@@ -33,7 +33,7 @@ struct Args {
     #[arg(short = 'q', long = "quorum", default_value_t = 50)]
     quorum: u8,
 
-    /// Quorum percentage (0-100)
+    /// Base file output path
     #[arg(long = "base-out-path", default_value = "./base.yaml")]
     base_out_path: String,
 }
