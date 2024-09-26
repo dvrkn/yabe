@@ -15,12 +15,12 @@ use yabe::merge::merge_yaml;
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Helm chart values file
-    #[arg(short = 'h', long = "helm", value_name = "HELM_VALUES_FILE")]
-    helm_values: Option<String>,
+    #[arg(short = 'r', long = "read-only-base", value_name = "READ_ONLY_BASE")]
+    read_only_base: Option<String>,
 
     /// Base YAML file to merge with input files
-    #[arg(long = "use-base", value_name = "PATH_TO_EXISTING_BASE")]
-    use_base: Option<String>,
+    #[arg(short = 'b', long = "base", value_name = "WRITE_BASE")]
+    base: Option<String>,
 
     /// Input YAML files
     #[arg(required = true)]
@@ -67,12 +67,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let base_out_path = args.base_out_path;
 
     // Read and parse the helm chart values file if provided
-    let helm_values = if let Some(ref helm_filename) = args.helm_values {
-        info!("Reading helm values file: {}", helm_filename);
-        let content = fs::read_to_string(helm_filename)?;
+    let helm_values = if let Some(ref read_only_base) = args.read_only_base {
+        info!("Reading helm values file: {}", read_only_base);
+        let content = fs::read_to_string(read_only_base)?;
         let docs = YamlLoader::load_from_str(&content)?;
         if docs.is_empty() {
-            warn!("No YAML documents in helm values file {}", helm_filename);
+            warn!("No YAML documents in helm values file {}", read_only_base);
             None
         } else {
             Some(docs[0].clone())
@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     // Read and parse the existing base file if provided
-    let existing_base = if let Some(ref base_path) = args.use_base {
+    let existing_base = if let Some(ref base_path) = args.base {
         info!("Reading existing base YAML file: {}", base_path);
         let content = fs::read_to_string(base_path)?;
         let docs = YamlLoader::load_from_str(&content)?;
