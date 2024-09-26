@@ -313,6 +313,16 @@ fn test_arrays_with_base() {
         Some(YamlLoader::load_from_str("app-backend:\n  migrationJob:\n    extraEnv:\n      - name: POSTGRESQL_CONNECTION_STRING\n        valueFrom:\n          secretKeyRef:\n            name: app-backend\n            key: POSTGRESQL_CONNECTION_STRING1").unwrap()[0].clone())
     ];
 
+    for (diff, expected_diff) in diffs.iter().zip(expected_diffs.iter()) {
+        match expected_diff {
+            Some(expected) => {
+                assert!(diff.is_some());
+                assert!(deep_equal(diff.as_ref().unwrap(), expected));
+            }
+            None => assert!(diff.is_none()),
+        }
+    }
+
 }
 
 #[test]
