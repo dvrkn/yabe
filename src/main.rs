@@ -8,6 +8,7 @@ use log::{info, warn};
 use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
 
 use yabe::diff::{compute_diff, diff_and_common_multiple};
+use yabe::merge::merge_yaml;
 
 /// Command-line arguments
 #[derive(Parser)]
@@ -16,6 +17,10 @@ struct Args {
     /// Helm chart values file
     #[arg(short = 'h', long = "helm", value_name = "HELM_VALUES_FILE")]
     helm_values: Option<String>,
+
+    /// Base YAML file to merge with input files
+    #[arg(long = "use-base", value_name = "PATH_TO_EXISTING_BASE")]
+    use_base: Option<String>,
 
     /// Input YAML files
     #[arg(required = true)]
@@ -30,7 +35,7 @@ struct Args {
     debug: bool,
 
     /// Quorum percentage (0-100)
-    #[arg(short = 'q', long = "quorum", default_value_t = 50)]
+    #[arg(short = 'q', long = "quorum", default_value_t = 51)]
     quorum: u8,
 
     /// Base file output path
@@ -76,9 +81,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         None
     };
 
-    // Read and parse each YAML file into an object
+    // Read and parse the existing base file if provided
+    let existing_base = if let Some(ref base_path) = args.use_base {
+        info!("Reading existing base YAML file: {}", base_path);
+        let content = fs::read_to_string(base_path)?;
+        let docs = YamlLoader::load_from_str(&content)?;
+        if docs.is_empty() {
+            warn!("No YAML documents in existing base file {}", base_path);
+            None
+        } else {
+            Some(docs[0].clone())
+        }
+    } else {
+        None
+    };
+
+    // Read and parse each YAML input file into an object
     let mut all_docs = Vec::new();
-    let mut objs = Vec::new();
     for filename in &input_filenames {
         info!("Reading input file: {}", filename);
         let content = fs::read_to_string(filename)?;
@@ -90,20 +109,33 @@ fn main() -> Result<(), Box<dyn Error>> {
         all_docs.push(docs);
     }
 
-    // Now collect references to the first document of each file
-    for docs in &all_docs {
-        objs.push(&docs[0]);
-    }
+    // Merge existing base with each input file if existing base is provided
+    let merged_objs: Vec<Yaml> = if let Some(ref base) = existing_base {
+        let objs: Vec<&Yaml>= all_docs.iter().map(|docs| &docs[0]).collect();
+        input_filenames
+            .iter()
+            .zip(objs.iter())
+            .map(|(filename, obj)| {
+                let merged = merge_yaml(base, obj);
+                info!("Merged base with input file: {}", filename);
+                merged
+            })
+            .collect()
+    } else {
+        // No existing base; use objs as merged_objs
+        all_docs.iter().map(|docs| docs[0].clone()).collect()
+    };
 
-    // Compute diffs between each obj and helm values
-    let diffs: Vec<_> = if let Some(helm) = helm_values.as_ref() {
-        info!("Computing diffs between override files and helm values.");
-        objs.iter()
+    // Compute diffs between each merged object and helm values
+    let diffs: Vec<_> = if let Some(ref helm) = helm_values {
+        info!("Computing diffs between merged files and helm values.");
+        merged_objs
+            .iter()
             .map(|obj| compute_diff(obj, helm).unwrap_or_else(|| Cow::Owned(Yaml::Null)))
             .collect()
     } else {
-        // No helm values; use objs as diffs
-        objs.iter().map(|obj| Cow::Borrowed(*obj)).collect()
+        // No helm values; use merged_objs as diffs
+        merged_objs.iter().map(|obj| Cow::Borrowed(obj)).collect()
     };
 
     // Now compute common base and per-file diffs among the diffs

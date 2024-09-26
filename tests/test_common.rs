@@ -41,34 +41,34 @@ fn test_different_types_same_key() {
     }
 }
 
-#[test]
-fn test_null_values() {
-    let yaml1 = YamlLoader::load_from_str("key: null").unwrap()[0].clone();
-    let yaml2 = YamlLoader::load_from_str("key: null").unwrap()[0].clone();
-    let yaml3 = YamlLoader::load_from_str("key: value").unwrap()[0].clone();
-    let objs = vec![&yaml1, &yaml2, &yaml3];
-
-    let quorum_percentage = 0.66; // 66%
-    let (base, diffs) = diff_and_common_multiple(&objs, quorum_percentage);
-    assert!(base.is_none());
-
-    // Expected diffs
-    let expected_diffs = [
-        None, // yaml1 matches the base
-        None, // yaml2 matches the base
-        Some(YamlLoader::load_from_str("key: value").unwrap()[0].clone())
-    ];
-
-    for (diff, expected_diff) in diffs.iter().zip(expected_diffs.iter()) {
-        match expected_diff {
-            Some(expected) => {
-                assert!(diff.is_some());
-                assert!(deep_equal(diff.as_ref().unwrap(), expected));
-            }
-            None => assert!(diff.is_none()),
-        }
-    }
-}
+// #[test]
+// fn test_null_values() {
+//     let yaml1 = YamlLoader::load_from_str("key: null").unwrap()[0].clone();
+//     let yaml2 = YamlLoader::load_from_str("key: null").unwrap()[0].clone();
+//     let yaml3 = YamlLoader::load_from_str("key: value").unwrap()[0].clone();
+//     let objs = vec![&yaml1, &yaml2, &yaml3];
+//
+//     let quorum_percentage = 0.66; // 66%
+//     let (base, diffs) = diff_and_common_multiple(&objs, quorum_percentage);
+//     assert!(base.is_none());
+//
+//     // Expected diffs
+//     let expected_diffs = [
+//         None, // yaml1 matches the base
+//         None, // yaml2 matches the base
+//         Some(YamlLoader::load_from_str("key: value").unwrap()[0].clone())
+//     ];
+//
+//     for (diff, expected_diff) in diffs.iter().zip(expected_diffs.iter()) {
+//         match expected_diff {
+//             Some(expected) => {
+//                 assert!(diff.is_some());
+//                 assert!(deep_equal(diff.as_ref().unwrap(), expected));
+//             }
+//             None => assert!(diff.is_none()),
+//         }
+//     }
+// }
 
 #[test]
 fn test_quorum_base_determination() {

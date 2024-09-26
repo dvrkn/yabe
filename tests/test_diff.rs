@@ -144,6 +144,7 @@ fn test_diff_and_common_multiple_arrays() {
     let (base, diffs) = diff_and_common_multiple(&objs, 0.51);
 
     // Since arrays differ, base is None
+    println!("{:?}", base);
     assert!(base.is_none());
 
     let expected_diffs = [
@@ -289,5 +290,47 @@ fn test_quorum_edge_case_high_quorum() {
     for (diff, expected_diff) in diffs.iter().zip(expected_diffs.iter()) {
         assert!(diff.is_some());
         assert!(deep_equal(diff.as_ref().unwrap(), expected_diff));
+    }
+}
+
+#[test]
+fn test_arrays_with_base() {
+    let yaml1 = YamlLoader::load_from_str("app-backend:\n  migrationJob:\n    extraEnv:\n      - name: POSTGRESQL_CONNECTION_STRING\n        valueFrom:\n          secretKeyRef:\n            name: app-backend\n            key: POSTGRESQL_CONNECTION_STRING").unwrap()[0].clone();
+    let yaml2 = YamlLoader::load_from_str("app-backend:\n  migrationJob:\n    extraEnv:\n      - name: POSTGRESQL_CONNECTION_STRING\n        valueFrom:\n          secretKeyRef:\n            name: app-backend\n            key: POSTGRESQL_CONNECTION_STRING").unwrap()[0].clone();
+    let yaml3 = YamlLoader::load_from_str("app-backend:\n  migrationJob:\n    extraEnv:\n      - name: POSTGRESQL_CONNECTION_STRING\n        valueFrom:\n          secretKeyRef:\n            name: app-backend\n            key: POSTGRESQL_CONNECTION_STRING1").unwrap()[0].clone();
+
+    let objs = vec![&yaml1, &yaml2, &yaml3];
+    let quorum_percentage = 0.51;
+    let (base, diffs) = diff_and_common_multiple(&objs, quorum_percentage);
+
+    assert!(base.is_some());
+    let expected_base = YamlLoader::load_from_str("app-backend:\n  migrationJob:\n    extraEnv:\n      - name: POSTGRESQL_CONNECTION_STRING\n        valueFrom:\n          secretKeyRef:\n            name: app-backend\n            key: POSTGRESQL_CONNECTION_STRING").unwrap()[0].clone();
+    assert!(deep_equal(&base.unwrap(), &expected_base));
+
+    let expected_diffs = [
+        None, // yaml1 matches the base
+        None, // yaml2 matches the base
+        Some(YamlLoader::load_from_str("app-backend:\n  migrationJob:\n    extraEnv:\n      - name: POSTGRESQL_CONNECTION_STRING\n        valueFrom:\n          secretKeyRef:\n            name: app-backend\n            key: POSTGRESQL_CONNECTION_STRING1").unwrap()[0].clone())
+    ];
+
+}
+
+#[test]
+fn test_diff_and_common_multiple_identical_arrays() {
+    let yaml1 = YamlLoader::load_from_str("items:\n  - a\n  - b").unwrap()[0].clone();
+    let yaml2 = YamlLoader::load_from_str("items:\n  - a\n  - b").unwrap()[0].clone();
+    let objs = vec![&yaml1, &yaml2];
+
+    let (base, diffs) = diff_and_common_multiple(&objs, 0.51);
+
+    // Arrays are identical, so base should include the array
+    assert!(base.is_some());
+
+    let expected_base = YamlLoader::load_from_str("items:\n  - a\n  - b").unwrap()[0].clone();
+    assert!(deep_equal(&base.unwrap(), &expected_base));
+
+    // Diffs should be empty
+    for diff in diffs.iter() {
+        assert!(diff.is_none());
     }
 }

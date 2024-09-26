@@ -49,3 +49,13 @@ fn test_deep_equal_nested() {
     assert!(deep_equal(&yaml1, &yaml2));
     assert!(!deep_equal(&yaml1, &yaml3));
 }
+
+#[test]
+fn test_deep_equal_arrays_nested() {
+    let yaml1 = YamlLoader::load_from_str("app-backend:\n  migrationJob:\n    extraEnv:\n      - name: POSTGRESQL_CONNECTION_STRING\n        valueFrom:\n          secretKeyRef:\n            name: app-backend\n            key: POSTGRESQL_CONNECTION_STRING").unwrap()[0].clone();
+    let yaml2 = YamlLoader::load_from_str("app-backend:\n  migrationJob:\n    extraEnv:\n      - name: POSTGRESQL_CONNECTION_STRING\n        valueFrom:\n          secretKeyRef:\n            name: app-backend\n            key: POSTGRESQL_CONNECTION_STRING").unwrap()[0].clone();
+    let yaml3 = YamlLoader::load_from_str("app-backend:\n  migrationJob:\n    extraEnv:\n      - name: POSTGRESQL_CONNECTION_STRING\n        valueFrom:\n          secretKeyRef:\n            name: app-backend\n            key: POSTGRESQL_CONNECTION_STRING1").unwrap()[0].clone();
+
+    assert!(deep_equal(&yaml1, &yaml2));
+    assert!(!deep_equal(&yaml1, &yaml3));
+}
