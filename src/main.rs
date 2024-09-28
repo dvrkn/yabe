@@ -43,7 +43,7 @@ struct Args {
     base_out_path: String,
 
     /// Base file output path
-    #[arg(long = "sort-config-path", default_value = "./config-gitops.yaml")]
+    #[arg(long = "sort-config-path", default_value = "")]
     sort_config_path: String,
 }
 
