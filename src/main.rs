@@ -6,7 +6,7 @@ use std::path::Path;
 use clap::Parser;
 use log::{info, warn};
 use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
-
+use yaml_sorter_rust::{load_config_from_file, process_yaml};
 use yabe::diff::{compute_diff, diff_and_common_multiple};
 use yabe::merge::merge_yaml;
 
@@ -27,7 +27,7 @@ struct Args {
     input_files: Vec<String>,
 
     /// Modify the original input files with diffs
-    #[arg(short = 'i', long = "inplace")]
+    #[arg(short = 'i', long = "in-place")]
     inplace: bool,
 
     /// Enable debug logging
@@ -41,6 +41,10 @@ struct Args {
     /// Base file output path
     #[arg(long = "base-out-path", default_value = "./base.yaml")]
     base_out_path: String,
+
+    /// Base file output path
+    #[arg(long = "sort-config-path", default_value = "./config-gitops.yaml")]
+    sort_config_path: String,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -148,11 +152,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Write the base YAML file if it exists
     if let Some(base_yaml) = base {
+        let mut base_yaml_processed = base_yaml.clone().into_owned();
+        process_yaml(&mut base_yaml_processed, &load_config_from_file(&args.sort_config_path));
+
         info!("Writing base YAML to {}", base_out_path);
         let mut out_str = String::new();
         {
             let mut emitter = YamlEmitter::new(&mut out_str);
-            emitter.dump(&base_yaml)?;
+            emitter.dump(&base_yaml_processed)?;
         }
         out_str = out_str.trim_start_matches("---\n").to_string();
         out_str.push('\n');
@@ -168,11 +175,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Modify the original input files with the diffs
         for (i, diff) in per_file_diffs.iter().enumerate() {
             if let Some(diff_yaml) = diff {
+                let mut diffl_processed = diff_yaml.clone().into_owned();
+                process_yaml(&mut diffl_processed, &load_config_from_file(&args.sort_config_path));
+
+
+
                 info!("Writing diff back to original file: {}", input_filenames[i]);
                 let mut out_str = String::new();
                 {
                     let mut emitter = YamlEmitter::new(&mut out_str);
-                    emitter.dump(diff_yaml)?;
+                    emitter.dump(&diffl_processed)?;
                 }
                 out_str = out_str.trim_start_matches("---\n").to_string();
                 out_str.push('\n');
