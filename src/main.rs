@@ -152,8 +152,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Write the base YAML file if it exists
     if let Some(base_yaml) = base {
-        let mut base_yaml_processed = base_yaml.clone().into_owned();
-        process_yaml(&mut base_yaml_processed, &load_config_from_file(&args.sort_config_path));
+
+        // Process the base YAML with the sort config
+        // TODO - This is a hacky way to do this. Need to refactor this.
+        let mut base_yaml_processed= base_yaml.clone().into_owned();
+
+        if args.sort_config_path != "" {
+            process_yaml(&mut base_yaml_processed, &load_config_from_file(&args.sort_config_path));
+        }
 
         info!("Writing base YAML to {}", base_out_path);
         let mut out_str = String::new();
@@ -175,10 +181,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Modify the original input files with the diffs
         for (i, diff) in per_file_diffs.iter().enumerate() {
             if let Some(diff_yaml) = diff {
+
+                // Process the diff YAML with the sort config
+                // TODO - This is a hacky way to do this. Need to refactor this.
                 let mut diffl_processed = diff_yaml.clone().into_owned();
-                process_yaml(&mut diffl_processed, &load_config_from_file(&args.sort_config_path));
 
-
+                if args.sort_config_path != "" {
+                    process_yaml(&mut diffl_processed, &load_config_from_file(&args.sort_config_path));
+                }
 
                 info!("Writing diff back to original file: {}", input_filenames[i]);
                 let mut out_str = String::new();
