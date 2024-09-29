@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::{HashSet};
+use std::collections::{HashMap, HashSet};
 
 use log::debug;
 use yaml_rust2::yaml::{Hash, Yaml};
@@ -12,7 +12,7 @@ pub fn compute_diff<'a>(obj: &'a Yaml, helm: &'a Yaml) -> Option<Cow<'a, Yaml>> 
     } else {
         match (obj, helm) {
             (Yaml::Hash(obj_hash), Yaml::Hash(helm_hash)) => {
-                let mut diff_hash = Hash::with_capacity(obj_hash.len());
+                let mut diff_hash = Hash::new();
                 for (key, obj_value) in obj_hash {
                     let helm_value = helm_hash.get(key).unwrap_or(&Yaml::Null);
                     if let Some(diff_value) = compute_diff(obj_value, helm_value) {
@@ -29,16 +29,20 @@ pub fn compute_diff<'a>(obj: &'a Yaml, helm: &'a Yaml) -> Option<Cow<'a, Yaml>> 
                 if obj_array.len() != helm_array.len() {
                     Some(Cow::Borrowed(obj))
                 } else {
-                    let mut diffs = Vec::with_capacity(obj_array.len());
                     let mut has_diff = false;
-                    for (obj_item, helm_item) in obj_array.iter().zip(helm_array.iter()) {
-                        if let Some(diff_item) = compute_diff(obj_item, helm_item) {
-                            diffs.push(diff_item.into_owned());
-                            has_diff = true;
-                        } else {
-                            diffs.push(Yaml::Null);
-                        }
-                    }
+                    let diffs: Vec<_> = obj_array
+                        .iter()
+                        .zip(helm_array.iter())
+                        .map(|(obj_item, helm_item)| {
+                            if let Some(diff_item) = compute_diff(obj_item, helm_item) {
+                                has_diff = true;
+                                diff_item.into_owned()
+                            } else {
+                                Yaml::Null
+                            }
+                        })
+                        .collect();
+
                     if has_diff {
                         Some(Cow::Owned(Yaml::Array(diffs)))
                     } else {
@@ -55,8 +59,7 @@ pub fn compute_diff<'a>(obj: &'a Yaml, helm: &'a Yaml) -> Option<Cow<'a, Yaml>> 
 pub fn diff_and_common_multiple<'a>(
     objs: &'a [&'a Yaml],
     quorum: f64,
-) -> (Option<Cow<'a, Yaml>>, Vec<Option<Cow<'a, Yaml>>>)
-{
+) -> (Option<Cow<'a, Yaml>>, Vec<Option<Cow<'a, Yaml>>>) {
     debug!(
         "diff_and_common_multiple called with {} objects and quorum {}%.",
         objs.len(),
@@ -71,10 +74,12 @@ pub fn diff_and_common_multiple<'a>(
     let total_files = objs.len();
     let quorum_count = (quorum * total_files as f64).ceil() as usize;
 
-    // Collect types of each object
-    let types: Vec<&str> = objs
-        .iter()
-        .map(|obj| match obj {
+    // Collect types of each object and check for type differences in a single pass
+    let mut type_set = HashSet::new();
+    let mut obj_type = "";
+
+    for obj in objs {
+        let obj_type_str = match obj {
             Yaml::Null => "null",
             Yaml::Boolean(_) => "bool",
             Yaml::Integer(_) => "int",
@@ -83,52 +88,40 @@ pub fn diff_and_common_multiple<'a>(
             Yaml::Array(_) => "array",
             Yaml::Hash(_) => "hash",
             _ => "unknown",
-        })
-        .collect();
-
-    let type_set: HashSet<&str> = types.iter().cloned().collect();
+        };
+        type_set.insert(obj_type_str);
+        if obj_type.is_empty() {
+            obj_type = obj_type_str;
+        }
+    }
 
     // If types differ, include them in diffs
     if type_set.len() > 1 {
         debug!("Types differ. Including entire values in diffs.");
         return (
             None,
-            objs.iter()
-                .map(|obj| Some(Cow::Borrowed(*obj)))
-                .collect(),
+            objs.iter().map(|obj| Some(Cow::Borrowed(*obj))).collect(),
         );
     }
-
-    let obj_type = types[0];
 
     // Handle primitive types and arrays as atomic units
     if obj_type != "hash" {
         debug!("Handling primitive types or arrays as atomic units.");
 
         // Collect occurrences of unique values using deep comparison
-        let mut occurrences: Vec<(&Yaml, usize)> = Vec::new();
+        let mut occurrences: HashMap<&Yaml, usize> = HashMap::new();
         for obj in objs {
-            let mut found = false;
-            for (val, count) in &mut occurrences {
-                if deep_equal(obj, val) {
-                    *count += 1;
-                    found = true;
-                    break;
-                }
-            }
-            if !found {
-                occurrences.push((obj, 1));
-            }
+            *occurrences.entry(*obj).or_insert(0) += 1;
         }
 
         // Find the value(s) that meet the quorum
-        let mut base_value = None;
-        for (val, count) in &occurrences {
-            if *count >= quorum_count {
-                base_value = Some(*val);
-                break;
+        let base_value = occurrences.iter().find_map(|(val, &count)| {
+            if count >= quorum_count {
+                Some(*val)
+            } else {
+                None
             }
-        }
+        });
 
         if let Some(base_val) = base_value {
             debug!("Base value determined by quorum: {:?}", base_val);
@@ -148,9 +141,7 @@ pub fn diff_and_common_multiple<'a>(
             debug!("No value meets the quorum; including all values in diffs.");
             return (
                 None,
-                objs.iter()
-                    .map(|obj| Some(Cow::Borrowed(*obj)))
-                    .collect(),
+                objs.iter().map(|obj| Some(Cow::Borrowed(*obj))).collect(),
             );
         }
     }
@@ -162,9 +153,7 @@ pub fn diff_and_common_multiple<'a>(
         let mut all_keys = HashSet::new();
         for obj in objs {
             if let Yaml::Hash(ref h) = obj {
-                for key in h.keys() {
-                    all_keys.insert(key);
-                }
+                all_keys.extend(h.keys());
             }
         }
 

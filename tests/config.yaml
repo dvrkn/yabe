@@ -1,0 +1,7 @@
+# Arrays sort key
+sortKey: name
+
+# Hashes pre-order
+preOrder:
+  - a
+  - b
