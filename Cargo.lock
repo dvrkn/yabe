@@ -386,7 +386,6 @@ dependencies = [
  "env_logger",
  "log",
  "yaml-rust2",
- "yaml_sorter_rust",
 ]
 
 [[package]]
@@ -398,15 +397,6 @@ dependencies = [
  "arraydeque",
  "encoding_rs",
  "hashlink",
-]
-
-[[package]]
-name = "yaml_sorter_rust"
-version = "0.1.1"
-source = "git+https://github.com/dvrkn/yaml-sorter-rust.git?branch=clap-refactor#78167d9becb67e16a99fd38501c29819a1939546"
-dependencies = [
- "clap",
- "yaml-rust2",
 ]
 
 [[package]]

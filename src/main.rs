@@ -6,9 +6,9 @@ use std::path::Path;
 use clap::Parser;
 use log::{info, warn};
 use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
-use yaml_sorter_rust::{load_config_from_file, process_yaml};
 use yabe::diff::{compute_diff, diff_and_common_multiple};
 use yabe::merge::merge_yaml;
+use yabe::sorter::sort_yaml;
 
 /// Command-line arguments
 #[derive(Parser)]
@@ -42,7 +42,7 @@ struct Args {
     #[arg(long = "base-out-path", default_value = "./base.yaml")]
     base_out_path: String,
 
-    /// Base file output path
+    /// Sort configuration file path
     #[arg(long = "sort-config-path", default_value = "")]
     sort_config_path: String,
 }
@@ -69,6 +69,20 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Get base output path
     let base_out_path = args.base_out_path;
+
+    // Load sorting configuration if provided
+    let config = if !args.sort_config_path.is_empty() {
+        let content = fs::read_to_string(&args.sort_config_path)?;
+        let docs = YamlLoader::load_from_str(&content)?;
+        if docs.is_empty() {
+            warn!("No YAML documents in config file {}", &args.sort_config_path);
+            Yaml::Null
+        } else {
+            docs[0].clone()
+        }
+    } else {
+        Yaml::Null
+    };
 
     // Read and parse the helm chart values file if provided
     let helm_values = if let Some(ref read_only_base) = args.read_only_base {
@@ -115,7 +129,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Merge existing base with each input file if existing base is provided
     let merged_objs: Vec<Yaml> = if let Some(ref base) = existing_base {
-        let objs: Vec<&Yaml>= all_docs.iter().map(|docs| &docs[0]).collect();
+        let objs: Vec<&Yaml> = all_docs.iter().map(|docs| &docs[0]).collect();
         input_filenames
             .iter()
             .zip(objs.iter())
@@ -150,22 +164,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     let (base, per_file_diffs) = diff_and_common_multiple(&diffs_refs, quorum_percentage);
 
-    // Write the base YAML file if it exists
+    // Process the base YAML if it exists
     if let Some(base_yaml) = base {
-
-        // Process the base YAML with the sort config
-        // TODO - This is a hacky way to do this. Need to refactor this.
-        let mut base_yaml_processed= base_yaml.clone().into_owned();
-
-        if args.sort_config_path != "" {
-            process_yaml(&mut base_yaml_processed, &load_config_from_file(&args.sort_config_path));
-        }
+        let processed_yaml = if config != Yaml::Null {
+            sort_yaml(base_yaml.clone(), &config)
+        } else {
+            base_yaml.clone()
+        };
 
         info!("Writing base YAML to {}", base_out_path);
         let mut out_str = String::new();
         {
             let mut emitter = YamlEmitter::new(&mut out_str);
-            emitter.dump(&base_yaml_processed)?;
+            emitter.dump(&processed_yaml)?;
         }
         out_str = out_str.trim_start_matches("---\n").to_string();
         out_str.push('\n');
@@ -181,20 +192,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Modify the original input files with the diffs
         for (i, diff) in per_file_diffs.iter().enumerate() {
             if let Some(diff_yaml) = diff {
-
-                // Process the diff YAML with the sort config
-                // TODO - This is a hacky way to do this. Need to refactor this.
-                let mut diffl_processed = diff_yaml.clone().into_owned();
-
-                if args.sort_config_path != "" {
-                    process_yaml(&mut diffl_processed, &load_config_from_file(&args.sort_config_path));
-                }
+                let processed_diff = if config != Yaml::Null {
+                    sort_yaml(diff_yaml.clone(), &config)
+                } else {
+                    diff_yaml.clone()
+                };
 
                 info!("Writing diff back to original file: {}", input_filenames[i]);
                 let mut out_str = String::new();
                 {
                     let mut emitter = YamlEmitter::new(&mut out_str);
-                    emitter.dump(&diffl_processed)?;
+                    emitter.dump(&processed_diff)?;
                 }
                 out_str = out_str.trim_start_matches("---\n").to_string();
                 out_str.push('\n');
@@ -218,11 +226,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Write diff files with modified names
         for (i, diff) in per_file_diffs.iter().enumerate() {
             if let Some(diff_yaml) = diff {
+                let processed_diff = if config != Yaml::Null {
+                    sort_yaml(diff_yaml.clone(), &config)
+                } else {
+                    diff_yaml.clone()
+                };
+
                 info!("Writing diff for {} to new file.", input_filenames[i]);
                 let mut out_str = String::new();
                 {
                     let mut emitter = YamlEmitter::new(&mut out_str);
-                    emitter.dump(diff_yaml)?;
+                    emitter.dump(&processed_diff)?;
                 }
                 // Extract the base name of the input file
                 let input_path = Path::new(&input_filenames[i]);
