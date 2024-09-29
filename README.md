@@ -1,36 +1,37 @@
-# YAML Diff Tool for Helm Chart Overrides
 
-## Introduction
+# YABE (YAml Base Extractor) - GitOps Organaizer
 
-This project provides a command-line tool written in Rust for computing the differences between multiple YAML files, specifically in the context of Helm chart overrides. The tool helps identify common base configurations and differences among multiple override files while considering a Helm values file as the base layer.
+YABE (YAML Base Extractor) is a command-line tool for merging, sorting, and computing differences between multiple YAML files. It also provides quorum-based logic to determine a common base YAML among multiple files.
 
 ## Features
 
-- **Compute Differences**: Calculates the differences between multiple YAML override files and a Helm values file.
-- **Common Base Extraction**: Identifies the common base configuration among the override files.
-- **Inplace Modification**: Optionally modifies the original override files to contain only their differences.
-- **Debug Logging**: Provides detailed debug logging to understand the processing steps.
-- **Recursive Comparison**: Handles complex nested structures in YAML files.
+- **Compute diffs:** Detect differences between YAML files.
+- **Merge YAML files:** Combine YAML files with a base YAML, either from an existing file or dynamically computed.
+- **Quorum-based diffing:** Extract common base YAML based on a quorum percentage.
+- **Sort YAML content:** Sort keys in YAML files based on user-defined configuration.
+- **Helm Values Integration:** Merge input YAML files with Helm values files.
+- **In-place modification or output to new files.**
 
 ## Usage
 
-**Command-Line Arguments**
 ```bash
-Usage: yabe [OPTIONS] [INPUT_FILES]...
+Usage: yabe [OPTIONS] <INPUT_FILES>...
 
 Arguments:
-  [INPUT_FILES]...  Input YAML files
+  <INPUT_FILES>...  Input YAML files
 
 Options:
-  -r, --read-only-base <READ_ONLY_BASE>  Helm chart values file. Will not be modified.
-  -b, --base <WRITE_BASE>                (Optional) Base values file. Will be modified if provided.
-  -i, --inplace                          Modify the original input files with diffs
-      --debug                            Enable debug logging
-  -q, --quorum <QUORUM>                  Quorum percentage (0-100) [default: 51]
-      --base-out-path <BASE_OUT_PATH>    Base file output path [default: ./base.yaml]
-  -h, --help                             Print help
-  -V, --version                          Print version
+  -r, --read-only-base <READ_ONLY_BASE>      Helm chart values file
+  -b, --base <WRITE_BASE>                    Base YAML file to merge with input files
+  -i, --in-place                             Modify the original input files with diffs
+      --debug                                Enable debug logging
+  -q, --quorum <QUORUM>                      Quorum percentage (0-100) [default: 51]
+      --base-out-path <BASE_OUT_PATH>        Base file output path [default: ./base.yaml]
+      --sort-config-path <SORT_CONFIG_PATH>  Sort configuration file path [default: ]
+  -h, --help                                 Print help
+  -V, --version                              Print version
 ```
+
 
 ### Basic Usage
 
@@ -138,7 +139,7 @@ settings:
 ### Inplace Modification Example
 Running with the -i flag:
 ```bash
-./yabe -i -h helm_values.yaml file1.yaml file2.yaml file3.yaml
+./yabe -i -r helm_values.yaml file1.yaml file2.yaml file3.yaml
 ```
 
 ## Testing
@@ -155,8 +156,11 @@ Ensure all tests pass to verify that the tool is functioning correctly.
   * _main.rs_: The main executable entry point.
   * _diff.rs_: Functions for computing diffs and common bases.
   * _deep_equal.rs_: Utility function for deep comparison of YAML values.
+  * _sorter.rs_: Functions for sorting YAML content.
 * _tests/_
   * _test_deep_equal.rs_: Tests for the deep_equal function.
   * _test_diff.rs_: Tests for compute_diff and diff_and_common_multiple functions.
   * _test_common.rs_: Common tests for the project.
+  * _test_sorter.rs_: Tests for the sorter functions.
 * _Cargo.toml_: Project configuration file.
+* _config-gitops.yaml_: Configuration file for sorting YAML content.
