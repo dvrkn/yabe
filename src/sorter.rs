@@ -1,18 +1,19 @@
 use yaml_rust2::yaml::{Array, Hash, Yaml};
 use std::borrow::Cow;
 
-pub fn sort_yaml<'a>(doc: Cow<'a, Yaml>, config: &Yaml) -> Cow<'a, Yaml> {
-    match &*doc {
+pub fn sort_yaml<'a>(doc: &'a Yaml, config: &Yaml) -> Cow<'a, Yaml> {
+    match doc {
         Yaml::Array(v) => {
             if let Some(sort_key) = config["sortKey"].as_str() {
                 let mut new_v = v.clone();
                 array_sorter(&mut new_v, sort_key);
                 for x in &mut new_v {
-                    *x = sort_yaml(Cow::Borrowed(x), config).into_owned();
+                    let sorted = sort_yaml(x, config);
+                    *x = sorted.into_owned();
                 }
                 Cow::Owned(Yaml::Array(new_v))
             } else {
-                doc
+                Cow::Borrowed(doc)
             }
         }
         Yaml::Hash(h) => {
@@ -24,14 +25,15 @@ pub fn sort_yaml<'a>(doc: Cow<'a, Yaml>, config: &Yaml) -> Cow<'a, Yaml> {
                     .collect::<Vec<&str>>();
                 hash_sorter(&mut new_h, &pre_order);
                 for (_, v) in &mut new_h {
-                    *v = sort_yaml(Cow::Borrowed(v), config).into_owned();
+                    let sorted = sort_yaml(v, config);
+                    *v = sorted.into_owned();
                 }
                 Cow::Owned(Yaml::Hash(new_h))
             } else {
-                doc
+                Cow::Borrowed(doc)
             }
         }
-        _ => doc,
+        _ => Cow::Borrowed(doc),
     }
 }
 

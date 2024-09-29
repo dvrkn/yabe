@@ -73,13 +73,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Load sorting configuration if provided
     let config = if !args.sort_config_path.is_empty() {
         let content = fs::read_to_string(&args.sort_config_path)?;
-        let docs = YamlLoader::load_from_str(&content)?;
-        if docs.is_empty() {
-            warn!("No YAML documents in config file {}", &args.sort_config_path);
-            Yaml::Null
-        } else {
-            docs[0].clone()
-        }
+        YamlLoader::load_from_str(&content)?.into_iter().next().unwrap_or(Yaml::Null)
     } else {
         Yaml::Null
     };
@@ -88,13 +82,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let helm_values = if let Some(ref read_only_base) = args.read_only_base {
         info!("Reading helm values file: {}", read_only_base);
         let content = fs::read_to_string(read_only_base)?;
-        let docs = YamlLoader::load_from_str(&content)?;
-        if docs.is_empty() {
-            warn!("No YAML documents in helm values file {}", read_only_base);
-            None
-        } else {
-            Some(docs[0].clone())
-        }
+        YamlLoader::load_from_str(&content)?.into_iter().next()
     } else {
         None
     };
@@ -103,13 +91,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let existing_base = if let Some(ref base_path) = args.base {
         info!("Reading existing base YAML file: {}", base_path);
         let content = fs::read_to_string(base_path)?;
-        let docs = YamlLoader::load_from_str(&content)?;
-        if docs.is_empty() {
-            warn!("No YAML documents in existing base file {}", base_path);
-            None
-        } else {
-            Some(docs[0].clone())
-        }
+        YamlLoader::load_from_str(&content)?.into_iter().next()
     } else {
         None
     };
@@ -119,20 +101,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     for filename in &input_filenames {
         info!("Reading input file: {}", filename);
         let content = fs::read_to_string(filename)?;
-        let docs = YamlLoader::load_from_str(&content)?;
-        if docs.is_empty() {
+        if let Some(doc) = YamlLoader::load_from_str(&content)?.into_iter().next() {
+            all_docs.push(doc);
+        } else {
             warn!("No YAML documents in {}", filename);
-            continue; // Skip empty files
         }
-        all_docs.push(docs);
     }
 
     // Merge existing base with each input file if existing base is provided
-    let merged_objs: Vec<Yaml> = if let Some(ref base) = existing_base {
-        let objs: Vec<&Yaml> = all_docs.iter().map(|docs| &docs[0]).collect();
+    let merged_objs: Vec<Cow<Yaml>> = if let Some(ref base) = existing_base {
         input_filenames
             .iter()
-            .zip(objs.iter())
+            .zip(all_docs.iter())
             .map(|(filename, obj)| {
                 let merged = merge_yaml(base, obj);
                 info!("Merged base with input file: {}", filename);
@@ -141,7 +121,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .collect()
     } else {
         // No existing base; use objs as merged_objs
-        all_docs.iter().map(|docs| docs[0].clone()).collect()
+        all_docs.iter().map(|doc| Cow::Borrowed(doc)).collect()
     };
 
     // Compute diffs between each merged object and helm values
@@ -149,11 +129,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         info!("Computing diffs between merged files and helm values.");
         merged_objs
             .iter()
-            .map(|obj| compute_diff(obj, helm).unwrap_or_else(|| Cow::Owned(Yaml::Null)))
+            .map(|obj| compute_diff(obj.as_ref(), helm).unwrap_or_else(|| Cow::Owned(Yaml::Null)))
             .collect()
     } else {
         // No helm values; use merged_objs as diffs
-        merged_objs.iter().map(|obj| Cow::Borrowed(obj)).collect()
+        merged_objs.clone()
     };
 
     // Now compute common base and per-file diffs among the diffs
@@ -167,9 +147,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Process the base YAML if it exists
     if let Some(base_yaml) = base {
         let processed_yaml = if config != Yaml::Null {
-            sort_yaml(base_yaml.clone(), &config)
+            sort_yaml(base_yaml.as_ref(), &config)
         } else {
-            base_yaml.clone()
+            Cow::Borrowed(base_yaml.as_ref())
         };
 
         info!("Writing base YAML to {}", base_out_path);
@@ -193,9 +173,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         for (i, diff) in per_file_diffs.iter().enumerate() {
             if let Some(diff_yaml) = diff {
                 let processed_diff = if config != Yaml::Null {
-                    sort_yaml(diff_yaml.clone(), &config)
+                    sort_yaml(diff_yaml.as_ref(), &config)
                 } else {
-                    diff_yaml.clone()
+                    Cow::Borrowed(diff_yaml.as_ref())
                 };
 
                 info!("Writing diff back to original file: {}", input_filenames[i]);
@@ -227,9 +207,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         for (i, diff) in per_file_diffs.iter().enumerate() {
             if let Some(diff_yaml) = diff {
                 let processed_diff = if config != Yaml::Null {
-                    sort_yaml(diff_yaml.clone(), &config)
+                    sort_yaml(diff_yaml.as_ref(), &config)
                 } else {
-                    diff_yaml.clone()
+                    Cow::Borrowed(diff_yaml.as_ref())
                 };
 
                 info!("Writing diff for {} to new file.", input_filenames[i]);

@@ -1,5 +1,5 @@
-pub mod diff;
 pub mod deep_equal;
+pub mod diff;
 pub mod merge;
 pub mod sorter;
 

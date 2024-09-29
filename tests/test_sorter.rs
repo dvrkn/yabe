@@ -1,20 +1,23 @@
 use yaml_rust2::{YamlLoader, Yaml, YamlEmitter};
-use std::borrow::Cow;
 use std::fs;
 use log::warn;
 use yabe::sorter::sort_yaml;
 
-// return yaml or error
+// Function to initialize test configuration
 pub fn init_test_config(config_path: &str) -> Yaml {
     let config_str = fs::read_to_string(config_path).unwrap_or_else(|e| {
         warn!("Failed to read config file: {}", e);
         String::new()
     });
 
-    YamlLoader::load_from_str(&config_str).unwrap_or_else(|e| {
-        warn!("Failed to parse config file: {}", e);
-        vec![]
-    }).into_iter().next().unwrap_or(Yaml::Null)
+    YamlLoader::load_from_str(&config_str)
+        .unwrap_or_else(|e| {
+            warn!("Failed to parse config file: {}", e);
+            vec![]
+        })
+        .into_iter()
+        .next()
+        .unwrap_or(Yaml::Null)
 }
 
 #[test]
@@ -37,15 +40,21 @@ fn test_hash_sorter() {
 
     let docs = YamlLoader::load_from_str(test_str).unwrap();
     let doc = &docs[0];
-    let processed_doc = sort_yaml(Cow::Borrowed(doc), &config);
+    let processed_doc = sort_yaml(doc, &config);
     println!("{:?}", processed_doc);
-    assert_eq!(processed_doc.into_owned(), Yaml::Hash(
-        vec![
-            (Yaml::String("a".to_string()), Yaml::Integer(1)),
-            (Yaml::String("b".to_string()), Yaml::Integer(2)),
-            (Yaml::String("c".to_string()), Yaml::Integer(3)),
-        ].into_iter().collect()
-    ));
+
+    assert_eq!(
+        processed_doc.into_owned(),
+        Yaml::Hash(
+            vec![
+                (Yaml::String("a".to_string()), Yaml::Integer(1)),
+                (Yaml::String("b".to_string()), Yaml::Integer(2)),
+                (Yaml::String("c".to_string()), Yaml::Integer(3)),
+            ]
+                .into_iter()
+                .collect()
+        )
+    );
 }
 
 #[test]
@@ -59,20 +68,37 @@ fn test_array_sorter() {
 
     let docs = YamlLoader::load_from_str(test_str).unwrap();
     let doc = &docs[0];
-    let processed_doc = sort_yaml(Cow::Borrowed(doc), &config);
-    assert_eq!(processed_doc.into_owned(), Yaml::Array(
-        vec![
+    let processed_doc = sort_yaml(doc, &config);
+
+    assert_eq!(
+        processed_doc.into_owned(),
+        Yaml::Array(vec![
             Yaml::Hash(
-                vec![(Yaml::String("name".to_string()), Yaml::String("Alice".to_string()))].into_iter().collect()
+                vec![(
+                    Yaml::String("name".to_string()),
+                    Yaml::String("Alice".to_string())
+                )]
+                    .into_iter()
+                    .collect()
             ),
             Yaml::Hash(
-                vec![(Yaml::String("name".to_string()), Yaml::String("Bob".to_string()))].into_iter().collect()
+                vec![(
+                    Yaml::String("name".to_string()),
+                    Yaml::String("Bob".to_string())
+                )]
+                    .into_iter()
+                    .collect()
             ),
             Yaml::Hash(
-                vec![(Yaml::String("name".to_string()), Yaml::String("Carol".to_string()))].into_iter().collect()
+                vec![(
+                    Yaml::String("name".to_string()),
+                    Yaml::String("Carol".to_string())
+                )]
+                    .into_iter()
+                    .collect()
             ),
-        ]
-    ));
+        ])
+    );
 }
 
 #[test]
@@ -117,7 +143,7 @@ spec:
 anchor: &test
   - anchor
 anchor-test: *test
-    "#;
+"#;
 
     let result = r#"---
 enabled: false
@@ -158,7 +184,7 @@ test: yaml"#;
 
     let docs = YamlLoader::load_from_str(test_str).unwrap();
     let doc = &docs[0];
-    let processed_doc = sort_yaml(Cow::Borrowed(doc), &config);
+    let processed_doc = sort_yaml(doc, &config);
 
     let mut out_str = String::new();
     {

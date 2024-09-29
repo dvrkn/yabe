@@ -12,7 +12,7 @@ pub fn compute_diff<'a>(obj: &'a Yaml, helm: &'a Yaml) -> Option<Cow<'a, Yaml>> 
     } else {
         match (obj, helm) {
             (Yaml::Hash(obj_hash), Yaml::Hash(helm_hash)) => {
-                let mut diff_hash = Hash::with_capacity(obj_hash.len());
+                let mut diff_hash = Hash::new();
                 for (key, obj_value) in obj_hash {
                     let helm_value = helm_hash.get(key).unwrap_or(&Yaml::Null);
                     if let Some(diff_value) = compute_diff(obj_value, helm_value) {
@@ -29,16 +29,20 @@ pub fn compute_diff<'a>(obj: &'a Yaml, helm: &'a Yaml) -> Option<Cow<'a, Yaml>> 
                 if obj_array.len() != helm_array.len() {
                     Some(Cow::Borrowed(obj))
                 } else {
-                    let mut diffs = Vec::with_capacity(obj_array.len());
                     let mut has_diff = false;
-                    for (obj_item, helm_item) in obj_array.iter().zip(helm_array.iter()) {
-                        if let Some(diff_item) = compute_diff(obj_item, helm_item) {
-                            diffs.push(diff_item.into_owned());
-                            has_diff = true;
-                        } else {
-                            diffs.push(Yaml::Null);
-                        }
-                    }
+                    let diffs: Vec<_> = obj_array
+                        .iter()
+                        .zip(helm_array.iter())
+                        .map(|(obj_item, helm_item)| {
+                            if let Some(diff_item) = compute_diff(obj_item, helm_item) {
+                                has_diff = true;
+                                diff_item.into_owned()
+                            } else {
+                                Yaml::Null
+                            }
+                        })
+                        .collect();
+
                     if has_diff {
                         Some(Cow::Owned(Yaml::Array(diffs)))
                     } else {
@@ -107,7 +111,7 @@ pub fn diff_and_common_multiple<'a>(
         // Collect occurrences of unique values using deep comparison
         let mut occurrences: HashMap<&Yaml, usize> = HashMap::new();
         for obj in objs {
-            *occurrences.entry(obj).or_insert(0) += 1;
+            *occurrences.entry(*obj).or_insert(0) += 1;
         }
 
         // Find the value(s) that meet the quorum

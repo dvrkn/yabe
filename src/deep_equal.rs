@@ -11,28 +11,16 @@ pub fn deep_equal(a: &Yaml, b: &Yaml) -> bool {
             if a_vec.len() != b_vec.len() {
                 false
             } else {
-                for (a_item, b_item) in a_vec.iter().zip(b_vec.iter()) {
-                    if !deep_equal(a_item, b_item) {
-                        return false;
-                    }
-                }
-                true
+                a_vec.iter().zip(b_vec.iter()).all(|(a_item, b_item)| deep_equal(a_item, b_item))
             }
         }
         (Yaml::Hash(a_hash), Yaml::Hash(b_hash)) => {
             if a_hash.len() != b_hash.len() {
                 false
             } else {
-                for (a_key, a_value) in a_hash.iter() {
-                    if let Some(b_value) = b_hash.get(a_key) {
-                        if !deep_equal(a_value, b_value) {
-                            return false;
-                        }
-                    } else {
-                        return false;
-                    }
-                }
-                true
+                a_hash.iter().all(|(a_key, a_value)| {
+                    b_hash.get(a_key).map_or(false, |b_value| deep_equal(a_value, b_value))
+                })
             }
         }
         (Yaml::Null, Yaml::Null) => true,
