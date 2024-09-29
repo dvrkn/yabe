@@ -1,5 +1,5 @@
 
-# YABE (YAml Base Extractor) - GitOps Organaizer
+# YABE (YAml Base Extractor) - GitOps Organizer
 
 YABE (YAML Base Extractor) is a command-line tool for merging, sorting, and computing differences between multiple YAML files. It also provides quorum-based logic to determine a common base YAML among multiple files.
 
