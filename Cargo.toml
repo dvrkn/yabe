@@ -1,5 +1,5 @@
 [package]
-name = "yabe"
+name = "yabe-gitops"
 description = "GitOps organizer"
 repository = "https://github.com/dvrkn/yabe"
 readme = "README.md"
