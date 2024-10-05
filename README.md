@@ -1,7 +1,7 @@
 
 # YABE (YAml Base Extractor) - Multi-layer YAML organizer
 
-The idea comes from the need to manage multiple YAML files in a GitOps environment. 
+The idea comes from the need to manage huge amount of YAML files in a GitOps environment. Especially when using ArgoCD multi-source apps with some common values and some overrides.
 The tool helps to compute the common base configuration among multiple YAML files and generate differences for each file, reducing the duplication of configuration values. 
 It also provides the ability to sort YAML content based on user-defined configuration.
 
