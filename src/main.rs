@@ -52,32 +52,24 @@ struct Args {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // Parse command-line arguments
     let args = Args::parse();
 
-    // Initialize the logger
     if args.debug {
         env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
     } else {
         env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     }
 
-    // Log the start of the program
     info!("Starting the YAML diffing program.");
 
-    // List of input YAML filenames from command-line arguments
     let input_filenames = args.input_files;
 
-    // Compute the quorum percentage from the command-line argument
     let quorum_percentage = (args.quorum as f64) / 100.0;
 
-    // Get base output path
     let base_out_path = args.base_out_path;
 
-    // Get output folder
     let out_folder = args.out_folder;
 
-    // Load sorting configuration if provided
     let config = if !args.sort_config_path.is_empty() {
         info!("Reading sort configuration file: {}", args.sort_config_path);
         let content = fs::read_to_string(&args.sort_config_path);
@@ -91,8 +83,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Yaml::Null
     };
 
-    // Read and parse the helm chart values file if provided
-    let helm_values = if let Some(ref read_only_base) = args.read_only_base {
+    let read_only_base = if let Some(ref read_only_base) = args.read_only_base {
         info!("Reading helm values file: {}", read_only_base);
         let content = fs::read_to_string(read_only_base)?;
         YamlLoader::load_from_str(&content)?.into_iter().next()
@@ -137,15 +128,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         all_docs.iter().map(|doc| Cow::Borrowed(doc)).collect()
     };
 
-    // Compute diffs between each merged object and helm values
-    let diffs: Vec<_> = if let Some(ref helm) = helm_values {
+    // Compute diffs between each merged object and read-only base
+    let diffs: Vec<_> = if let Some(ref helm) = read_only_base {
         info!("Computing diffs between merged files and helm values.");
         merged_objs
             .iter()
             .map(|obj| compute_diff(obj.as_ref(), helm).unwrap_or_else(|| Cow::Owned(Yaml::Null)))
             .collect()
     } else {
-        // No helm values; use merged_objs as diffs
+        // No read-only base provided values; use merged_objs as diffs
         merged_objs.clone()
     };
 
@@ -182,7 +173,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Determine whether to write diffs to original files or new files
     if args.inplace {
         info!("Inplace mode enabled. Modifying original files.");
-        // Modify the original input files with the diffs
         for (i, diff) in per_file_diffs.iter().enumerate() {
             if let Some(diff_yaml) = diff {
                 let processed_diff = if config != Yaml::Null {
@@ -216,7 +206,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     } else {
         info!("Writing diffs to new files.");
-        // Write diff files with modified names
         for (i, diff) in per_file_diffs.iter().enumerate() {
             if let Some(diff_yaml) = diff {
                 let processed_diff = if config != Yaml::Null {
@@ -231,7 +220,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     let mut emitter = YamlEmitter::new(&mut out_str);
                     emitter.dump(&processed_diff)?;
                 }
-                // Extract the base name of the input file
+
                 let input_path = Path::new(&input_filenames[i]);
                 let file_stem = input_path
                     .file_stem()
