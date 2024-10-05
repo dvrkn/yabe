@@ -1,7 +1,11 @@
 [package]
 name = "yabe"
+description = "GitOps organizer"
+repository = "https://github.com/dvrkn/yabe"
+readme = "README.md"
 version = "0.1.2"
 edition = "2021"
+keywords = ["gitops", "kubernetes", "argocd", "yaml"]
 
 [[bin]]
 name = "yabe"
