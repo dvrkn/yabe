@@ -1,7 +1,10 @@
 
-# YABE (YAml Base Extractor) - GitOps Organizer
+# YABE (YAml Base Extractor) - Multi-layer YAML organizer
 
-YABE (YAML Base Extractor) is a command-line tool for merging, sorting, and computing differences between multiple YAML files. It also provides quorum-based logic to determine a common base YAML among multiple files.
+The idea comes from the need to manage multiple YAML files in a GitOps environment. 
+The tool helps to compute the common base configuration among multiple YAML files and generate differences for each file, reducing the duplication of configuration values. 
+It also provides the ability to sort YAML content based on user-defined configuration.
+
 
 ## Features
 
@@ -21,13 +24,14 @@ Arguments:
   <INPUT_FILES>...  Input YAML files
 
 Options:
-  -r, --read-only-base <READ_ONLY_BASE>      Helm chart values file
-  -b, --base <WRITE_BASE>                    Base YAML file to merge with input files
+  -r, --read-base <READ_BASE>                (Optional) Read-only base for values deduplication
+  -b, --base <WRITE_BASE>                    (Optional) Common values of all input files, if not provided, will be computed
   -i, --in-place                             Modify the original input files with diffs
+  -o, --out <OUT_FOLDER>                     Output folder for diff files [default: ./out]
       --debug                                Enable debug logging
   -q, --quorum <QUORUM>                      Quorum percentage (0-100) [default: 51]
-      --base-out-path <BASE_OUT_PATH>        Base file output path [default: ./base.yaml]
-      --sort-config-path <SORT_CONFIG_PATH>  Sort configuration file path [default: ]
+      --base-out-path <BASE_OUT_PATH>        (Optional) Base file output path [default: ./base.yaml]
+      --sort-config-path <SORT_CONFIG_PATH>  (Optional) Sort configuration file path [default: ./sort-config.yaml], if not provided, will not sort
   -h, --help                                 Print help
   -V, --version                              Print version
 ```

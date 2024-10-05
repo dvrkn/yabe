@@ -103,7 +103,7 @@ fn test_array_sorter() {
 
 #[test]
 fn full_test() {
-    let config = init_test_config("config-gitops.yaml");
+    let config = init_test_config("sort-config.yaml");
 
     let test_str = r#"
 test: yaml

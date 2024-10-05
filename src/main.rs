@@ -15,7 +15,7 @@ use yabe::sorter::sort_yaml;
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Helm chart values file
-    #[arg(short = 'r', long = "read-only-base", value_name = "READ_ONLY_BASE")]
+    #[arg(short = 'r', long = "read-base", value_name = "READ_BASE")]
     read_only_base: Option<String>,
 
     /// Base YAML file to merge with input files
@@ -30,6 +30,10 @@ struct Args {
     #[arg(short = 'i', long = "in-place")]
     inplace: bool,
 
+    /// Output folder
+    #[arg(short = 'o', long = "out", default_value = "./out")]
+    out_folder: String,
+
     /// Enable debug logging
     #[arg(long = "debug")]
     debug: bool,
@@ -43,7 +47,7 @@ struct Args {
     base_out_path: String,
 
     /// Sort configuration file path
-    #[arg(long = "sort-config-path", default_value = "")]
+    #[arg(long = "sort-config-path", default_value = "./sort-config.yaml")]
     sort_config_path: String,
 }
 
@@ -70,10 +74,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Get base output path
     let base_out_path = args.base_out_path;
 
+    // Get output folder
+    let out_folder = args.out_folder;
+
     // Load sorting configuration if provided
     let config = if !args.sort_config_path.is_empty() {
-        let content = fs::read_to_string(&args.sort_config_path)?;
-        YamlLoader::load_from_str(&content)?.into_iter().next().unwrap_or(Yaml::Null)
+        info!("Reading sort configuration file: {}", args.sort_config_path);
+        let content = fs::read_to_string(&args.sort_config_path);
+        if let Ok(content) = content {
+            YamlLoader::load_from_str(&content)?.into_iter().next().unwrap_or(Yaml::Null)
+        } else {
+            warn!("Failed to read sort configuration file: {}", args.sort_config_path);
+            Yaml::Null
+        }
     } else {
         Yaml::Null
     };
@@ -224,8 +237,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     .file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("diff");
-                // Create the diff filename by appending '_diff.yaml'
-                let diff_filename = format!("{}_diff.yaml", file_stem);
+                let diff_filename = format!("{}/{}_diff.yaml", out_folder, file_stem);
                 out_str = out_str.trim_start_matches("---\n").to_string();
                 out_str.push('\n');
                 fs::write(&diff_filename, out_str)?;
