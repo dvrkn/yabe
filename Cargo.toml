@@ -6,6 +6,7 @@ readme = "README.md"
 version = "0.1.2"
 edition = "2021"
 keywords = ["gitops", "kubernetes", "argocd", "yaml"]
+license = "MIT"
 
 [[bin]]
 name = "yabe"
