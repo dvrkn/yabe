@@ -53,14 +53,14 @@ This will compute the differences among the override files and generate:
 
 Use the -i or --inplace flag to modify the original override files with their differences:
 ```bash
-./yabe -i -h helm_values.yaml file1.yaml file2.yaml file3.yaml
+./yabe -i -r helm_values.yaml file1.yaml file2.yaml file3.yaml
 ```
 
 ### Enable Debug Logging
 
 Use the --debug flag to enable detailed debug logging:
 ```bash
-./yabe --debug -h helm_values.yaml file1.yaml file2.yaml file3.yaml
+./yabe --debug -r helm_values.yaml file1.yaml file2.yaml file3.yaml
 ```
 
 ## Examples
@@ -110,7 +110,7 @@ settings:
 ### Running the Tool
     
 ```bash
-./yabe -h helm_values.yaml file1.yaml file2.yaml file3.yaml
+./yabe -r helm_values.yaml file1.yaml file2.yaml file3.yaml
 ```
 
 ### Expected Output
@@ -167,4 +167,4 @@ Ensure all tests pass to verify that the tool is functioning correctly.
   * _test_common.rs_: Common tests for the project.
   * _test_sorter.rs_: Tests for the sorter functions.
 * _Cargo.toml_: Project configuration file.
-* _config-gitops.yaml_: Configuration file for sorting YAML content.
+* _sort-config.yaml_: Configuration file for sorting YAML content.
