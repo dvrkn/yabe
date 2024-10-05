@@ -15,6 +15,12 @@ It also provides the ability to sort YAML content based on user-defined configur
 - **Helm Values Integration:** Merge input YAML files with Helm values files.
 - **In-place modification or output to new files.**
 
+## Installation
+
+```bash
+cargo install yabe-gitops
+```
+
 ## Usage
 
 ```bash
