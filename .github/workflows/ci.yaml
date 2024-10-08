@@ -2,16 +2,20 @@ on:
   push:
     branches:
       - master
+      - develop
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+        arch: [x86_64, aarch64]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          profile: minimal
           toolchain: stable
           override: true
       - name: Release Build
