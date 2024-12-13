@@ -1,0 +1,12 @@
+read_only_base: "./in/read-base.yaml"
+base: "./in/base.yaml"
+input_files:
+  - "./in/a.yaml"
+  - "./in/b.yaml"
+  - "./in/c.yaml"
+inplace: false
+out_folder: "./out"
+debug: false
+quorum: 60
+base_out_path: "./out/base.yaml"
+sort_config_path: "./sort-config.yaml" 
