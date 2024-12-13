@@ -9,11 +9,17 @@ use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
 use yabe::diff::{compute_diff, diff_and_common_multiple};
 use yabe::merge::merge_yaml;
 use yabe::sorter::sort_yaml;
+use serde::Deserialize;
+use serde_yaml;
 
 /// Command-line arguments
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
+    /// Configuration file
+    #[arg(long = "config", value_name = "CONFIG_FILE")]
+    config: Option<String>,
+
     /// Helm chart values file
     #[arg(short = 'r', long = "read-base", value_name = "READ_BASE")]
     read_only_base: Option<String>,
@@ -23,7 +29,6 @@ struct Args {
     base: Option<String>,
 
     /// Input YAML files
-    #[arg(required = true)]
     input_files: Vec<String>,
 
     /// Modify the original input files with diffs
@@ -51,13 +56,90 @@ struct Args {
     sort_config_path: String,
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let args = Args::parse();
+#[derive(Deserialize)]
+struct Config {
+    read_only_base: Option<String>,
+    base: Option<String>,
+    input_files: Option<Vec<String>>,
+    inplace: Option<bool>,
+    out_folder: Option<String>,
+    debug: Option<bool>,
+    quorum: Option<u8>,
+    base_out_path: Option<String>,
+    sort_config_path: Option<String>,
+}
 
+fn main() -> Result<(), Box<dyn Error>> {
+    let mut args = Args::parse();
+
+    if let Some(config_path) = args.config.as_ref() {
+        // Read the configuration file
+        let config_content = fs::read_to_string(config_path)?;
+        let config: Config = serde_yaml::from_str(&config_content)?;
+
+        // Override args with config values if they are not provided via command-line
+        if args.read_only_base.is_none() {
+            args.read_only_base = config.read_only_base;
+        }
+
+        if args.base.is_none() {
+            args.base = config.base;
+        }
+
+        if args.input_files.is_empty() {
+            if let Some(input_files) = config.input_files {
+                args.input_files = input_files;
+            }
+        }
+
+        if !args.inplace {
+            if let Some(inplace) = config.inplace {
+                args.inplace = inplace;
+            }
+        }
+
+        if args.out_folder == "./out" {
+            if let Some(out_folder) = config.out_folder {
+                args.out_folder = out_folder;
+            }
+        }
+
+        if !args.debug {
+            if let Some(debug) = config.debug {
+                args.debug = debug;
+            }
+        }
+
+        if args.quorum == 51 {
+            if let Some(quorum) = config.quorum {
+                args.quorum = quorum;
+            }
+        }
+
+        if args.base_out_path == "./base.yaml" {
+            if let Some(base_out_path) = config.base_out_path {
+                args.base_out_path = base_out_path;
+            }
+        }
+
+        if args.sort_config_path == "./sort-config.yaml" {
+            if let Some(sort_config_path) = config.sort_config_path {
+                args.sort_config_path = sort_config_path;
+            }
+        }
+    }
+
+    // Initialize logger with appropriate level
     if args.debug {
         env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
     } else {
         env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    }
+
+    // Validate that input_files are provided
+    if args.input_files.is_empty() {
+        eprintln!("Error: No input files provided. Please specify input files via command-line arguments or in the configuration file.");
+        std::process::exit(1);
     }
 
     info!("Starting the YAML diffing program.");
