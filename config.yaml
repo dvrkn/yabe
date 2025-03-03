@@ -3,6 +3,11 @@ base: "path/to/base.yaml"
 input_files:
   - "input1.yaml"
   - "input2.yaml"
+path_patterns:
+  - "*.yaml"
+  - "configs/*.yaml"
+# OR
+# path_pattern: "configs/*.yaml"
 inplace: true
 out_folder: "./output"
 debug: false

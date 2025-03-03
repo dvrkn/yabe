@@ -11,10 +11,11 @@ use yabe::merge::merge_yaml;
 use yabe::sorter::sort_yaml;
 use serde::Deserialize;
 use serde_yaml;
+use glob::glob;
 
 /// Command-line arguments
 #[derive(Parser)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version, about = "YAML diff and merge tool for GitOps workflows", long_about = "A tool for diffing, merging, and organizing YAML files for GitOps workflows. Supports both individual file paths and glob patterns.")]
 struct Args {
     /// Configuration file
     #[arg(long = "config", value_name = "CONFIG_FILE")]
@@ -28,8 +29,12 @@ struct Args {
     #[arg(short = 'b', long = "base", value_name = "WRITE_BASE")]
     base: Option<String>,
 
-    /// Input YAML files
+    /// Input YAML files (optional if path patterns are provided)
     input_files: Vec<String>,
+
+    /// Path patterns to load YAML files (e.g., "*.yaml")
+    #[arg(short = 'p', long = "path-pattern", value_name = "PATH_PATTERN")]
+    path_patterns: Vec<String>,
 
     /// Modify the original input files with diffs
     #[arg(short = 'i', long = "in-place")]
@@ -61,6 +66,8 @@ struct Config {
     read_only_base: Option<String>,
     base: Option<String>,
     input_files: Option<Vec<String>>,
+    path_patterns: Option<Vec<String>>,
+    path_pattern: Option<String>,
     inplace: Option<bool>,
     out_folder: Option<String>,
     debug: Option<bool>,
@@ -89,6 +96,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         if args.input_files.is_empty() {
             if let Some(input_files) = config.input_files {
                 args.input_files = input_files;
+            }
+        }
+
+        if args.path_patterns.is_empty() {
+            if let Some(path_patterns) = config.path_patterns {
+                args.path_patterns = path_patterns;
+            } else if let Some(path_pattern) = config.path_pattern.as_ref() {
+                args.path_patterns.push(path_pattern.clone());
             }
         }
 
@@ -136,21 +151,62 @@ fn main() -> Result<(), Box<dyn Error>> {
         env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     }
 
-    // Validate that input_files are provided
-    if args.input_files.is_empty() {
-        eprintln!("Error: No input files provided. Please specify input files via command-line arguments or in the configuration file.");
+    // Process path patterns and add matching files to input_files
+    let mut expanded_input_files = args.input_files.clone();
+    
+    for pattern in &args.path_patterns {
+        info!("Expanding path pattern: {}", pattern);
+        match glob(pattern) {
+            Ok(paths) => {
+                for entry in paths {
+                    match entry {
+                        Ok(path) => {
+                            if path.is_file() {
+                                if let Some(path_str) = path.to_str() {
+                                    info!("Found matching file: {}", path_str);
+                                    expanded_input_files.push(path_str.to_string());
+                                }
+                            }
+                        }
+                        Err(e) => warn!("Error matching path: {}", e),
+                    }
+                }
+            }
+            Err(e) => warn!("Invalid glob pattern '{}': {}", pattern, e),
+        }
+    }
+    
+    // Remove duplicates from expanded_input_files
+    expanded_input_files.sort();
+    expanded_input_files.dedup();
+    
+    // Validate that either input_files or path_patterns are provided
+    if expanded_input_files.is_empty() && args.path_patterns.is_empty() {
+        eprintln!("Error: No input files or path patterns provided. Please specify either input files or path patterns via command-line arguments or in the configuration file.");
+        std::process::exit(1);
+    }
+    
+    // Validate that we have at least one file to process after expansion
+    if expanded_input_files.is_empty() {
+        eprintln!("Error: No files found matching the provided path patterns. Please check your patterns and try again.");
         std::process::exit(1);
     }
 
     info!("Starting the YAML diffing program.");
 
-    let input_filenames = args.input_files;
+    let input_filenames = expanded_input_files;
 
     let quorum_percentage = (args.quorum as f64) / 100.0;
 
     let base_out_path = args.base_out_path;
 
     let out_folder = args.out_folder;
+
+    // Ensure output directory exists
+    if !Path::new(&out_folder).exists() {
+        info!("Creating output directory: {}", out_folder);
+        fs::create_dir_all(&out_folder)?;
+    }
 
     let config = if !args.sort_config_path.is_empty() {
         info!("Reading sort configuration file: {}", args.sort_config_path);
