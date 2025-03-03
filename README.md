@@ -21,24 +21,27 @@ cargo install yabe-gitops
 ## Usage
 
 ```bash
-Usage: yabe [OPTIONS] <INPUT_FILES>...
+Usage: yabe [OPTIONS] [INPUT_FILES]...
 
 Arguments:
-  <INPUT_FILES>...  Input YAML files
+  [INPUT_FILES]...  Input YAML files (optional if path patterns are provided)
 
 Options:
   -r, --read-base <READ_BASE>                (Optional) Read-only base for values deduplication
   -b, --base <WRITE_BASE>                    (Optional) Common values of all input files, if not provided, will be computed
+  -p, --path-pattern <PATH_PATTERN>          Path patterns to load YAML files (e.g., "*.yaml")
   -i, --in-place                             Modify the original input files with diffs
   -o, --out <OUT_FOLDER>                     Output folder for diff files [default: ./out]
       --debug                                Enable debug logging
   -q, --quorum <QUORUM>                      Quorum percentage (0-100) [default: 51]
       --base-out-path <BASE_OUT_PATH>        (Optional) Base file output path [default: ./base.yaml]
       --sort-config-path <SORT_CONFIG_PATH>  (Optional) Sort configuration file path [default: ./sort-config.yaml], if not provided, will not sort
+      --config <CONFIG_FILE>                 (Optional) Configuration file
   -h, --help                                 Print help
   -V, --version                              Print version
 ```
 
+**Note:** You must provide either input files or path patterns. If both are provided, all matching files will be processed.
 
 ### Basic Usage
 
@@ -47,6 +50,13 @@ Run the tool with the YAML override files:
 ```bash
 ./yabe file1.yaml file2.yaml file3.yaml
 ```
+
+Or use path patterns to load multiple files:
+
+```bash
+./yabe -p "*.yaml" -p "configs/*.yaml"
+```
+
 This will compute the differences among the override files and generate:
 
 * base.yaml: The common base configuration.
@@ -64,6 +74,38 @@ Use the -i or --inplace flag to modify the original override files with their di
 Use the --debug flag to enable detailed debug logging:
 ```bash
 ./yabe --debug -r helm_values.yaml file1.yaml file2.yaml file3.yaml
+```
+
+### Using Configuration File
+
+You can also use a configuration file to specify options:
+
+```yaml
+# config.yaml
+read_only_base: "path/to/read_only_base.yaml"
+base: "path/to/base.yaml"
+# Either input_files or path_patterns/path_pattern (or both) must be specified
+input_files:
+  - "input1.yaml"
+  - "input2.yaml"
+# You can use either path_patterns (array) or path_pattern (single string)
+path_patterns:
+  - "*.yaml"
+  - "configs/*.yaml"
+# OR
+# path_pattern: "*.yaml"
+inplace: true
+out_folder: "./output"
+debug: false
+quorum: 60
+base_out_path: "./base_output.yaml"
+sort_config_path: "./sort_config.yaml"
+```
+
+Then run the tool with:
+
+```bash
+./yabe --config config.yaml
 ```
 
 ## Examples
