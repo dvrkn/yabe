@@ -8,6 +8,7 @@ YABE is a tool designed to help manage large amounts of YAML files in a GitOps e
 - **Merge YAML files:** Combine YAML files with a base YAML, either from an existing file or dynamically computed.
 - **Quorum-based diffing:** Extract common base YAML based on a quorum percentage.
 - **Sort YAML content:** Sort keys in YAML files based on user-defined configuration.
+- **Sort-only mode:** Sort YAML files without performing any diffing operations.
 - **Helm Values Integration:** Merge input YAML files with Helm values files.
 - **In-place modification or output to new files.**
 - **Configuration File Support:** Run the tool using a configuration file to simplify usage in automated workflows.
@@ -36,6 +37,7 @@ Options:
   -q, --quorum <QUORUM>                      Quorum percentage (0-100) [default: 51]
       --base-out-path <BASE_OUT_PATH>        (Optional) Base file output path [default: ./base.yaml]
       --sort-config-path <SORT_CONFIG_PATH>  (Optional) Sort configuration file path [default: ./sort-config.yaml], if not provided, will not sort
+      --sort-only                            Sort only mode - only sort files without diffing
       --config <CONFIG_FILE>                 (Optional) Configuration file
   -h, --help                                 Print help
   -V, --version                              Print version
@@ -62,9 +64,9 @@ This will compute the differences among the override files and generate:
 * base.yaml: The common base configuration.
 * file1_diff.yaml, file2_diff.yaml, file3_diff.yaml: The differences for each file.
 
-### Inplace Modification
+### In-place Modification
 
-Use the -i or --inplace flag to modify the original override files with their differences:
+Use the -i or --in-place flag to modify the original override files with their differences:
 ```bash
 ./yabe -i -r helm_values.yaml file1.yaml file2.yaml file3.yaml
 ```
@@ -74,6 +76,24 @@ Use the -i or --inplace flag to modify the original override files with their di
 Use the --debug flag to enable detailed debug logging:
 ```bash
 ./yabe --debug -r helm_values.yaml file1.yaml file2.yaml file3.yaml
+```
+
+### Sort Only Mode
+
+Use the --sort-only flag to only sort YAML files without performing any diffing operations:
+
+```bash
+# Sort files and output to ./out directory
+./yabe --sort-only --sort-config-path sort-config.yaml file1.yaml file2.yaml
+
+# Sort files in-place (modify original files)
+./yabe --sort-only --sort-config-path sort-config.yaml -i file1.yaml file2.yaml
+
+# Sort files using path patterns
+./yabe --sort-only --sort-config-path sort-config.yaml -p "*.yaml" -p "configs/*.yaml"
+
+# Sort files to a specific output directory
+./yabe --sort-only --sort-config-path sort-config.yaml -o ./sorted-files *.yaml
 ```
 
 ### Using Configuration File
@@ -100,6 +120,7 @@ debug: false
 quorum: 60
 base_out_path: "./base_output.yaml"
 sort_config_path: "./sort_config.yaml"
+sort_only: false  # Set to true for sort-only mode
 ```
 
 Then run the tool with:
@@ -185,7 +206,7 @@ settings:
     level: 7
 ```
 
-### Inplace Modification Example
+### In-place Modification Example
 Running with the -i flag:
 ```bash
 ./yabe -i -r helm_values.yaml file1.yaml file2.yaml file3.yaml

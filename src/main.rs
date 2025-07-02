@@ -59,6 +59,10 @@ struct Args {
     /// Sort configuration file path
     #[arg(long = "sort-config-path", default_value = "./sort-config.yaml")]
     sort_config_path: String,
+
+    /// Sort only mode - only sort files without diffing
+    #[arg(long = "sort-only")]
+    sort_only: bool,
 }
 
 #[derive(Deserialize)]
@@ -74,6 +78,110 @@ struct Config {
     quorum: Option<u8>,
     base_out_path: Option<String>,
     sort_config_path: Option<String>,
+    sort_only: Option<bool>,
+}
+
+fn sort_only_workflow(args: &Args) -> Result<(), Box<dyn Error>> {
+    info!("Running in sort-only mode");
+
+    // Process path patterns and add matching files to input_files
+    let mut expanded_input_files = args.input_files.clone();
+    
+    for pattern in &args.path_patterns {
+        info!("Expanding path pattern: {}", pattern);
+        match glob(pattern) {
+            Ok(paths) => {
+                for entry in paths {
+                    match entry {
+                        Ok(path) => {
+                            if path.is_file() {
+                                if let Some(path_str) = path.to_str() {
+                                    info!("Found matching file: {}", path_str);
+                                    expanded_input_files.push(path_str.to_string());
+                                }
+                            }
+                        }
+                        Err(e) => warn!("Error matching path: {}", e),
+                    }
+                }
+            }
+            Err(e) => warn!("Invalid glob pattern '{}': {}", pattern, e),
+        }
+    }
+    
+    // Remove duplicates from expanded_input_files
+    expanded_input_files.sort();
+    expanded_input_files.dedup();
+    
+    // Validate that we have files to process
+    if expanded_input_files.is_empty() {
+        eprintln!("Error: No input files found for sort-only mode. Please specify either input files or path patterns.");
+        std::process::exit(1);
+    }
+
+    // Read sort configuration
+    let sort_config = if !args.sort_config_path.is_empty() && Path::new(&args.sort_config_path).exists() {
+        info!("Reading sort configuration file: {}", args.sort_config_path);
+        let content = fs::read_to_string(&args.sort_config_path)?;
+        YamlLoader::load_from_str(&content)?.into_iter().next().unwrap_or(Yaml::Null)
+    } else {
+        eprintln!("Error: Sort configuration file is required for sort-only mode but not found: {}", args.sort_config_path);
+        std::process::exit(1);
+    };
+
+    if sort_config == Yaml::Null {
+        eprintln!("Error: Sort configuration file is empty or invalid: {}", args.sort_config_path);
+        std::process::exit(1);
+    }
+
+    // Ensure output directory exists if not in-place mode
+    if !args.inplace {
+        if !Path::new(&args.out_folder).exists() {
+            info!("Creating output directory: {}", args.out_folder);
+            fs::create_dir_all(&args.out_folder)?;
+        }
+    }
+
+    // Process each input file
+    for filename in &expanded_input_files {
+        info!("Sorting file: {}", filename);
+        
+        // Read and parse the YAML file
+        let content = fs::read_to_string(filename)?;
+        if let Some(doc) = YamlLoader::load_from_str(&content)?.into_iter().next() {
+            // Sort the YAML document
+            let sorted_yaml = sort_yaml(&doc, &sort_config);
+            
+            // Convert to string
+            let mut out_str = String::new();
+            {
+                let mut emitter = YamlEmitter::new(&mut out_str);
+                emitter.dump(&sorted_yaml)?;
+            }
+            out_str = out_str.trim_start_matches("---\n").to_string();
+            out_str.push('\n');
+            
+            // Write the sorted content
+            if args.inplace {
+                info!("Writing sorted content back to: {}", filename);
+                fs::write(filename, out_str)?;
+            } else {
+                let input_path = Path::new(filename);
+                let file_stem = input_path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("sorted");
+                let sorted_filename = format!("{}/{}_sorted.yaml", args.out_folder, file_stem);
+                info!("Writing sorted content to: {}", sorted_filename);
+                fs::write(&sorted_filename, out_str)?;
+            }
+        } else {
+            warn!("No YAML documents found in {}", filename);
+        }
+    }
+
+    info!("Sort-only workflow completed successfully.");
+    Ok(())
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -142,6 +250,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 args.sort_config_path = sort_config_path;
             }
         }
+
+        if !args.sort_only {
+            if let Some(sort_only) = config.sort_only {
+                args.sort_only = sort_only;
+            }
+        }
     }
 
     // Initialize logger with appropriate level
@@ -149,6 +263,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
     } else {
         env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    }
+
+    // Handle sort-only mode
+    if args.sort_only {
+        return sort_only_workflow(&args);
     }
 
     // Process path patterns and add matching files to input_files
