@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use clap::Parser;
-use log::{info, warn};
+use log::info;
 use yaml_rust2::{Yaml, YamlEmitter, YamlLoader};
 use yabe::diff::{compute_diff, diff_and_common_multiple};
 use yabe::merge::merge_yaml;
@@ -93,7 +93,7 @@ fn sort_only_workflow(args: &Args) -> Result<(), Box<dyn Error>> {
     let mut expanded_input_files = args.input_files.clone();
     
     for pattern in &args.path_patterns {
-        info!("Expanding path pattern: {}", pattern);
+        log::debug!("Expanding path pattern: {}", pattern);
         match glob(pattern) {
             Ok(paths) => {
                 for entry in paths {
@@ -101,16 +101,16 @@ fn sort_only_workflow(args: &Args) -> Result<(), Box<dyn Error>> {
                         Ok(path) => {
                             if path.is_file() {
                                 if let Some(path_str) = path.to_str() {
-                                    info!("Found matching file: {}", path_str);
+                                    log::debug!("Found matching file: {}", path_str);
                                     expanded_input_files.push(path_str.to_string());
                                 }
                             }
                         }
-                        Err(e) => warn!("Error matching path: {}", e),
+                        Err(e) => log::debug!("Error matching path: {}", e),
                     }
                 }
             }
-            Err(e) => warn!("Invalid glob pattern '{}': {}", pattern, e),
+            Err(e) => log::debug!("Invalid glob pattern '{}': {}", pattern, e),
         }
     }
     
@@ -128,7 +128,7 @@ fn sort_only_workflow(args: &Args) -> Result<(), Box<dyn Error>> {
                         if let Ok(excluded_path) = entry {
                             if let Some(excluded_path_str) = excluded_path.to_str() {
                                 if file_path == excluded_path_str {
-                                    info!("Excluding file: {} (matches pattern: {})", file_path, exclude_pattern);
+                                    log::debug!("Excluding file: {} (matches pattern: {})", file_path, exclude_pattern);
                                     return false;
                                 }
                             }
@@ -139,7 +139,7 @@ fn sort_only_workflow(args: &Args) -> Result<(), Box<dyn Error>> {
                 if let Some(filename) = Path::new(file_path).file_name() {
                     if let Some(filename_str) = filename.to_str() {
                         if glob::Pattern::new(exclude_pattern).map_or(false, |p| p.matches(filename_str)) {
-                            info!("Excluding file: {} (filename matches pattern: {})", file_path, exclude_pattern);
+                            log::debug!("Excluding file: {} (filename matches pattern: {})", file_path, exclude_pattern);
                             return false;
                         }
                     }
@@ -149,7 +149,7 @@ fn sort_only_workflow(args: &Args) -> Result<(), Box<dyn Error>> {
         });
         let excluded_count = original_count - expanded_input_files.len();
         if excluded_count > 0 {
-            info!("Excluded {} files based on exclude patterns", excluded_count);
+            log::debug!("Excluded {} files based on exclude patterns", excluded_count);
         }
     }
     
@@ -161,7 +161,7 @@ fn sort_only_workflow(args: &Args) -> Result<(), Box<dyn Error>> {
 
     // Read sort configuration
     let sort_config = if !args.sort_config_path.is_empty() && Path::new(&args.sort_config_path).exists() {
-        info!("Reading sort configuration file: {}", args.sort_config_path);
+        log::debug!("Reading sort configuration file: {}", args.sort_config_path);
         let content = fs::read_to_string(&args.sort_config_path)?;
         YamlLoader::load_from_str(&content)?.into_iter().next().unwrap_or(Yaml::Null)
     } else {
@@ -177,14 +177,14 @@ fn sort_only_workflow(args: &Args) -> Result<(), Box<dyn Error>> {
     // Ensure output directory exists if not in-place mode
     if !args.inplace {
         if !Path::new(&args.out_folder).exists() {
-            info!("Creating output directory: {}", args.out_folder);
+            log::debug!("Creating output directory: {}", args.out_folder);
             fs::create_dir_all(&args.out_folder)?;
         }
     }
 
     // Process each input file
     for filename in &expanded_input_files {
-        info!("Sorting file: {}", filename);
+        log::debug!("Sorting file: {}", filename);
         
         // Read and parse the YAML file
         let content = fs::read_to_string(filename)?;
@@ -203,7 +203,7 @@ fn sort_only_workflow(args: &Args) -> Result<(), Box<dyn Error>> {
             
             // Write the sorted content
             if args.inplace {
-                info!("Writing sorted content back to: {}", filename);
+                log::debug!("Writing sorted content back to: {}", filename);
                 fs::write(filename, out_str)?;
             } else {
                 let input_path = Path::new(filename);
@@ -212,11 +212,11 @@ fn sort_only_workflow(args: &Args) -> Result<(), Box<dyn Error>> {
                     .and_then(|s| s.to_str())
                     .unwrap_or("sorted");
                 let sorted_filename = format!("{}/{}_sorted.yaml", args.out_folder, file_stem);
-                info!("Writing sorted content to: {}", sorted_filename);
+                log::debug!("Writing sorted content to: {}", sorted_filename);
                 fs::write(&sorted_filename, out_str)?;
             }
         } else {
-            warn!("No YAML documents found in {}", filename);
+            log::warn!("No YAML documents found in {}", filename);
         }
     }
 
@@ -320,7 +320,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut expanded_input_files = args.input_files.clone();
     
     for pattern in &args.path_patterns {
-        info!("Expanding path pattern: {}", pattern);
+        log::debug!("Expanding path pattern: {}", pattern);
         match glob(pattern) {
             Ok(paths) => {
                 for entry in paths {
@@ -328,16 +328,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                         Ok(path) => {
                             if path.is_file() {
                                 if let Some(path_str) = path.to_str() {
-                                    info!("Found matching file: {}", path_str);
+                                    log::debug!("Found matching file: {}", path_str);
                                     expanded_input_files.push(path_str.to_string());
                                 }
                             }
                         }
-                        Err(e) => warn!("Error matching path: {}", e),
+                        Err(e) => log::debug!("Error matching path: {}", e),
                     }
                 }
             }
-            Err(e) => warn!("Invalid glob pattern '{}': {}", pattern, e),
+            Err(e) => log::debug!("Invalid glob pattern '{}': {}", pattern, e),
         }
     }
     
@@ -369,17 +369,17 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Ensure output directory exists
     if !Path::new(&out_folder).exists() {
-        info!("Creating output directory: {}", out_folder);
+        log::debug!("Creating output directory: {}", out_folder);
         fs::create_dir_all(&out_folder)?;
     }
 
     let config = if !args.sort_config_path.is_empty() {
-        info!("Reading sort configuration file: {}", args.sort_config_path);
+        log::debug!("Reading sort configuration file: {}", args.sort_config_path);
         let content = fs::read_to_string(&args.sort_config_path);
         if let Ok(content) = content {
             YamlLoader::load_from_str(&content)?.into_iter().next().unwrap_or(Yaml::Null)
         } else {
-            warn!("Failed to read sort configuration file: {}", args.sort_config_path);
+            log::debug!("Failed to read sort configuration file: {}", args.sort_config_path);
             Yaml::Null
         }
     } else {
@@ -387,7 +387,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let read_only_base = if let Some(ref read_only_base) = args.read_only_base {
-        info!("Reading helm values file: {}", read_only_base);
+        log::debug!("Reading helm values file: {}", read_only_base);
         let content = fs::read_to_string(read_only_base)?;
         YamlLoader::load_from_str(&content)?.into_iter().next()
     } else {
@@ -396,7 +396,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Read and parse the existing base file if provided
     let existing_base = if let Some(ref base_path) = args.base {
-        info!("Reading existing base YAML file: {}", base_path);
+        log::debug!("Reading existing base YAML file: {}", base_path);
         let content = fs::read_to_string(base_path)?;
         YamlLoader::load_from_str(&content)?.into_iter().next()
     } else {
@@ -406,12 +406,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Read and parse each YAML input file into an object
     let mut all_docs = Vec::new();
     for filename in &input_filenames {
-        info!("Reading input file: {}", filename);
+        log::debug!("Reading input file: {}", filename);
         let content = fs::read_to_string(filename)?;
         if let Some(doc) = YamlLoader::load_from_str(&content)?.into_iter().next() {
             all_docs.push(doc);
         } else {
-            warn!("No YAML documents in {}", filename);
+            log::warn!("No YAML documents in {}", filename);
         }
     }
 
@@ -422,7 +422,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .zip(all_docs.iter())
             .map(|(filename, obj)| {
                 let merged = merge_yaml(base, obj);
-                info!("Merged base with input file: {}", filename);
+                log::debug!("Merged base with input file: {}", filename);
                 merged
             })
             .collect()
@@ -433,7 +433,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Compute diffs between each merged object and read-only base
     let diffs: Vec<_> = if let Some(ref helm) = read_only_base {
-        info!("Computing diffs between merged files and helm values.");
+        log::debug!("Computing diffs between merged files and helm values.");
         merged_objs
             .iter()
             .map(|obj| compute_diff(obj.as_ref(), helm).unwrap_or_else(|| Cow::Owned(Yaml::Null)))
@@ -459,7 +459,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             Cow::Borrowed(base_yaml.as_ref())
         };
 
-        info!("Writing base YAML to {}", base_out_path);
+        log::debug!("Writing base YAML to {}", base_out_path);
         let mut out_str = String::new();
         {
             let mut emitter = YamlEmitter::new(&mut out_str);
@@ -468,14 +468,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         out_str = out_str.trim_start_matches("---\n").to_string();
         out_str.push('\n');
         fs::write(base_out_path.as_str(), out_str)?;
-        info!("Base YAML written to {}", base_out_path);
+        log::debug!("Base YAML written to {}", base_out_path);
     } else {
-        info!("No base YAML to write.");
+        log::debug!("No base YAML to write.");
     }
 
     // Determine whether to write diffs to original files or new files
     if args.inplace {
-        info!("Inplace mode enabled. Modifying original files.");
+        log::debug!("Inplace mode enabled. Modifying original files.");
         for (i, diff) in per_file_diffs.iter().enumerate() {
             if let Some(diff_yaml) = diff {
                 let processed_diff = if config != Yaml::Null {
@@ -484,7 +484,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     Cow::Borrowed(diff_yaml.as_ref())
                 };
 
-                info!("Writing diff back to original file: {}", input_filenames[i]);
+                log::debug!("Writing diff back to original file: {}", input_filenames[i]);
                 let mut out_str = String::new();
                 {
                     let mut emitter = YamlEmitter::new(&mut out_str);
@@ -493,22 +493,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                 out_str = out_str.trim_start_matches("---\n").to_string();
                 out_str.push('\n');
                 fs::write(&input_filenames[i], out_str)?;
-                info!(
+                log::debug!(
                     "Difference written back to original file {}",
                     input_filenames[i]
                 );
             } else {
                 // If there is no diff, remove the content of the file
-                info!("No diff for {}; clearing file content.", input_filenames[i]);
+                log::debug!("No diff for {}; clearing file content.", input_filenames[i]);
                 fs::write(&input_filenames[i], "")?;
-                info!(
+                log::debug!(
                     "No difference for {}; file content cleared.",
                     input_filenames[i]
                 );
             }
         }
     } else {
-        info!("Writing diffs to new files.");
+        log::debug!("Writing diffs to new files.");
         for (i, diff) in per_file_diffs.iter().enumerate() {
             if let Some(diff_yaml) = diff {
                 let processed_diff = if config != Yaml::Null {
@@ -517,7 +517,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     Cow::Borrowed(diff_yaml.as_ref())
                 };
 
-                info!("Writing diff for {} to new file.", input_filenames[i]);
+                log::debug!("Writing diff for {} to new file.", input_filenames[i]);
                 let mut out_str = String::new();
                 {
                     let mut emitter = YamlEmitter::new(&mut out_str);
@@ -533,12 +533,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 out_str = out_str.trim_start_matches("---\n").to_string();
                 out_str.push('\n');
                 fs::write(&diff_filename, out_str)?;
-                info!(
+                log::debug!(
                     "Difference for {} written to {}",
                     input_filenames[i], diff_filename
                 );
             } else {
-                info!("No diff for {}; not writing a diff file.", input_filenames[i]);
+                log::debug!("No diff for {}; not writing a diff file.", input_filenames[i]);
             }
         }
     }
