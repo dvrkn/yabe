@@ -10,7 +10,7 @@ use yabe::diff::{compute_diff, diff_and_common_multiple};
 use yabe::merge::merge_yaml;
 use yabe::sorter::sort_yaml;
 use serde::Deserialize;
-use serde_yaml;
+use serde_yml;
 use glob::glob;
 
 /// Command-line arguments
@@ -230,7 +230,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if let Some(config_path) = args.config.as_ref() {
         // Read the configuration file
         let config_content = fs::read_to_string(config_path)?;
-        let config: Config = serde_yaml::from_str(&config_content)?;
+        let config: Config = serde_yml::from_str(&config_content)?;
 
         // Override args with config values if they are not provided via command-line
         if args.read_only_base.is_none() {
