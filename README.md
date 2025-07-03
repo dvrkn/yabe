@@ -38,6 +38,7 @@ Options:
       --base-out-path <BASE_OUT_PATH>        (Optional) Base file output path [default: ./base.yaml]
       --sort-config-path <SORT_CONFIG_PATH>  (Optional) Sort configuration file path [default: ./sort-config.yaml], if not provided, will not sort
       --sort-only                            Sort only mode - only sort files without diffing
+      --exclude <EXCLUDE_PATTERN>            Exclude patterns to skip files (e.g., "*.terraform.yaml")
       --config <CONFIG_FILE>                 (Optional) Configuration file
   -h, --help                                 Print help
   -V, --version                              Print version
@@ -94,6 +95,12 @@ Use the --sort-only flag to only sort YAML files without performing any diffing 
 
 # Sort files to a specific output directory
 ./yabe --sort-only --sort-config-path sort-config.yaml -o ./sorted-files *.yaml
+
+# Sort files recursively while excluding certain patterns
+./yabe --sort-only --sort-config-path sort-config.yaml -p "**/*.yaml" --exclude "*.terraform.yaml" --exclude "*-template.yaml"
+
+# Sort files in-place while excluding terraform files
+./yabe --sort-only --sort-config-path sort-config.yaml -p "./envs/**/*.yaml" --exclude "*.terraform.yaml" -i
 ```
 
 ### Using Configuration File
@@ -121,6 +128,9 @@ quorum: 60
 base_out_path: "./base_output.yaml"
 sort_config_path: "./sort_config.yaml"
 sort_only: false  # Set to true for sort-only mode
+exclude_patterns:  # Optional: patterns to exclude from sorting
+  - "*.terraform.yaml"
+  - "*-template.yaml"
 ```
 
 Then run the tool with:

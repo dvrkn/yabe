@@ -63,6 +63,10 @@ struct Args {
     /// Sort only mode - only sort files without diffing
     #[arg(long = "sort-only")]
     sort_only: bool,
+
+    /// Exclude patterns to skip files (e.g., "*.terraform.yaml")
+    #[arg(long = "exclude", value_name = "EXCLUDE_PATTERN")]
+    exclude_patterns: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -79,6 +83,7 @@ struct Config {
     base_out_path: Option<String>,
     sort_config_path: Option<String>,
     sort_only: Option<bool>,
+    exclude_patterns: Option<Vec<String>>,
 }
 
 fn sort_only_workflow(args: &Args) -> Result<(), Box<dyn Error>> {
@@ -112,6 +117,41 @@ fn sort_only_workflow(args: &Args) -> Result<(), Box<dyn Error>> {
     // Remove duplicates from expanded_input_files
     expanded_input_files.sort();
     expanded_input_files.dedup();
+    
+    // Filter out excluded files
+    if !args.exclude_patterns.is_empty() {
+        let original_count = expanded_input_files.len();
+        expanded_input_files.retain(|file_path| {
+            for exclude_pattern in &args.exclude_patterns {
+                if let Ok(paths) = glob(exclude_pattern) {
+                    for entry in paths {
+                        if let Ok(excluded_path) = entry {
+                            if let Some(excluded_path_str) = excluded_path.to_str() {
+                                if file_path == excluded_path_str {
+                                    info!("Excluding file: {} (matches pattern: {})", file_path, exclude_pattern);
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                }
+                // Also check if the filename matches the pattern directly
+                if let Some(filename) = Path::new(file_path).file_name() {
+                    if let Some(filename_str) = filename.to_str() {
+                        if glob::Pattern::new(exclude_pattern).map_or(false, |p| p.matches(filename_str)) {
+                            info!("Excluding file: {} (filename matches pattern: {})", file_path, exclude_pattern);
+                            return false;
+                        }
+                    }
+                }
+            }
+            true
+        });
+        let excluded_count = original_count - expanded_input_files.len();
+        if excluded_count > 0 {
+            info!("Excluded {} files based on exclude patterns", excluded_count);
+        }
+    }
     
     // Validate that we have files to process
     if expanded_input_files.is_empty() {
@@ -254,6 +294,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         if !args.sort_only {
             if let Some(sort_only) = config.sort_only {
                 args.sort_only = sort_only;
+            }
+        }
+
+        if args.exclude_patterns.is_empty() {
+            if let Some(exclude_patterns) = config.exclude_patterns {
+                args.exclude_patterns = exclude_patterns;
             }
         }
     }
