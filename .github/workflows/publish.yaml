@@ -56,17 +56,10 @@ jobs:
               PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
               
               if [ -n "$PREVIOUS_TAG" ]; then
-                echo "### Changes since $PREVIOUS_TAG" > temp_changelog.md
-                echo "" >> temp_changelog.md
-                git log --oneline --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD >> temp_changelog.md
+                CHANGELOG_SECTION="### Changes since $PREVIOUS_TAG"$'\n'$'\n'$(git log --oneline --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD)
               else
-                echo "### Changes in this release" > temp_changelog.md
-                echo "" >> temp_changelog.md
-                git log --oneline --pretty=format:"- %s (%h)" -n 10 >> temp_changelog.md
+                CHANGELOG_SECTION="### Changes in this release"$'\n'$'\n'$(git log --oneline --pretty=format:"- %s (%h)" -n 10)
               fi
-              
-              CHANGELOG_SECTION=$(cat temp_changelog.md)
-              rm temp_changelog.md
             fi
           else
             echo "No CHANGELOG.md found, generating from git commits..."
@@ -75,21 +68,17 @@ jobs:
             PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
             
             if [ -n "$PREVIOUS_TAG" ]; then
-              echo "### Changes since $PREVIOUS_TAG" > temp_changelog.md
-              echo "" >> temp_changelog.md
-              git log --oneline --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD >> temp_changelog.md
+              CHANGELOG_SECTION="### Changes since $PREVIOUS_TAG"$'\n'$'\n'$(git log --oneline --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD)
             else
-              echo "### Changes in this release" > temp_changelog.md
-              echo "" >> temp_changelog.md
-              git log --oneline --pretty=format:"- %s (%h)" -n 10 >> temp_changelog.md
+              CHANGELOG_SECTION="### Changes in this release"$'\n'$'\n'$(git log --oneline --pretty=format:"- %s (%h)" -n 10)
             fi
-            
-            CHANGELOG_SECTION=$(cat temp_changelog.md)
-            rm temp_changelog.md
           fi
           
-          # Write to file for release update
-          echo "$CHANGELOG_SECTION" > release_notes.md
+          # Store changelog in GitHub output using heredoc to handle multiline content
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG_SECTION" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
           echo "Generated changelog for release page"
       
       - name: Update release with changelog
@@ -98,7 +87,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.get_version.outputs.tag }}
-          body_path: release_notes.md
+          body: ${{ steps.changelog.outputs.notes }}
           append_body: true
       
       - name: Run tests
