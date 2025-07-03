@@ -101,6 +101,55 @@ Use the --sort-only flag to only sort YAML files without performing any diffing 
 
 # Sort files in-place while excluding terraform files
 ./yabe --sort-only --sort-config-path sort-config.yaml -p "./envs/**/*.yaml" --exclude "*.terraform.yaml" -i
+
+# Exclude files by directory name (any file with "target" in the path)
+./yabe --sort-only --sort-config-path sort-config.yaml -p "**/*.yaml" --exclude "target"
+
+# Exclude multiple patterns - files in build directories and temp files
+./yabe --sort-only --sort-config-path sort-config.yaml -p "**/*.yaml" --exclude "target" --exclude "build" --exclude "*.tmp"
+```
+
+### Exclude Patterns
+
+The `--exclude` option supports flexible pattern matching to skip unwanted files during processing. You can specify multiple exclude patterns, and files matching any pattern will be skipped.
+
+**Supported pattern types:**
+
+1. **Substring matching**: Excludes files containing the pattern anywhere in the path
+   ```bash
+   --exclude "target"          # Excludes files with "target" in the path
+   --exclude "node_modules"    # Excludes files with "node_modules" in the path
+   ```
+
+2. **Glob patterns**: Standard file matching patterns
+   ```bash
+   --exclude "*.tmp"           # Excludes all .tmp files
+   --exclude ".*"              # Excludes hidden files
+   --exclude "test_*.yaml"     # Excludes files starting with "test_"
+   ```
+
+3. **Path component matching**: Matches against individual directories or filenames
+   ```bash
+   --exclude "build"           # Excludes files in any "build" directory
+   --exclude "dist"            # Excludes files in any "dist" directory
+   ```
+
+4. **Full path glob matching**: Complex path patterns
+   ```bash
+   --exclude "*/temp/*"        # Excludes files in any "temp" subdirectory
+   --exclude "target/**"       # Excludes all files under target directory
+   ```
+
+**Examples:**
+```bash
+# Exclude multiple directory types
+./yabe -p "**/*.yaml" --exclude "target" --exclude "node_modules" --exclude ".git"
+
+# Exclude by file patterns and directories
+./yabe -p "**/*.yaml" --exclude "*.terraform.yaml" --exclude "build" --exclude "dist"
+
+# Complex exclusion for GitOps environments
+./yabe --sort-only -p "**/*.yaml" --exclude "target" --exclude ".argocd" --exclude "*.secret.yaml"
 ```
 
 ### Using Configuration File

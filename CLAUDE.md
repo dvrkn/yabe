@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Important Notes for Claude Code
+
+* Always commit as current user, not as `claude`.
+
 ## Project Overview
 
 YABE (YAml Base Extractor) is a GitOps YAML organizer tool written in Rust. It computes common base configurations among multiple YAML files and generates differences for each file, reducing duplication in GitOps workflows. The tool supports quorum-based diffing, YAML sorting, and both configuration file and command-line interfaces.
@@ -36,6 +40,12 @@ cargo run -- -i -r helm_values.yaml file1.yaml file2.yaml
 
 # Using path patterns
 cargo run -- -p "*.yaml" -p "configs/*.yaml"
+
+# Using exclude patterns to skip files
+cargo run -- -p "**/*.yaml" --exclude "target" --exclude "*.tmp"
+
+# Sort-only mode with exclusions
+cargo run -- --sort-only --sort-config-path ./sort-config.yaml -p "**/*.yaml" --exclude "target"
 ```
 
 ## Architecture
@@ -50,11 +60,12 @@ cargo run -- -p "*.yaml" -p "configs/*.yaml"
 
 ### Key Data Flow
 1. **Input Processing**: Parse CLI args and config files, expand glob patterns
-2. **YAML Loading**: Read and parse all input YAML files
-3. **Base Merging**: If existing base provided, merge with each input file
-4. **Diff Computation**: Compute diffs against read-only base (if provided)
-5. **Quorum Processing**: Extract common base from diffs using quorum percentage
-6. **Output Generation**: Write base file and per-file diffs (in-place or to output folder)
+2. **File Filtering**: Apply exclude patterns to filter out unwanted files using multiple matching strategies
+3. **YAML Loading**: Read and parse all remaining input YAML files
+4. **Base Merging**: If existing base provided, merge with each input file
+5. **Diff Computation**: Compute diffs against read-only base (if provided)
+6. **Quorum Processing**: Extract common base from diffs using quorum percentage
+7. **Output Generation**: Write base file and per-file diffs (in-place or to output folder)
 
 ### Configuration System
 The tool supports both command-line arguments and YAML configuration files. Config file values are overridden by command-line arguments. Key configuration options:
@@ -62,6 +73,7 @@ The tool supports both command-line arguments and YAML configuration files. Conf
 - `base`: Existing base to merge with inputs  
 - `quorum`: Percentage threshold for common base extraction
 - `sort_config_path`: YAML sorting rules configuration
+- `exclude_patterns`: Patterns to exclude files during processing (supports substring, glob, and path component matching)
 
 ### Testing Structure
 Tests are organized by module:
