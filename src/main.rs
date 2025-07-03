@@ -123,24 +123,40 @@ fn sort_only_workflow(args: &Args) -> Result<(), Box<dyn Error>> {
         let original_count = expanded_input_files.len();
         expanded_input_files.retain(|file_path| {
             for exclude_pattern in &args.exclude_patterns {
-                if let Ok(paths) = glob(exclude_pattern) {
-                    for entry in paths {
-                        if let Ok(excluded_path) = entry {
-                            if let Some(excluded_path_str) = excluded_path.to_str() {
-                                if file_path == excluded_path_str {
-                                    info!("Excluding file: {} (matches pattern: {})", file_path, exclude_pattern);
-                                    return false;
-                                }
+                // Check if the file path contains the exclude pattern as a substring
+                if file_path.contains(exclude_pattern) {
+                    info!("Excluding file: {} (path contains pattern: {})", file_path, exclude_pattern);
+                    return false;
+                }
+                
+                // Check if the exclude pattern matches as a glob pattern against the full path
+                if let Ok(pattern) = glob::Pattern::new(exclude_pattern) {
+                    if pattern.matches(file_path) {
+                        info!("Excluding file: {} (path matches glob pattern: {})", file_path, exclude_pattern);
+                        return false;
+                    }
+                }
+                
+                // Check if any component of the path matches the pattern
+                for component in Path::new(file_path).components() {
+                    if let Some(component_str) = component.as_os_str().to_str() {
+                        if let Ok(pattern) = glob::Pattern::new(exclude_pattern) {
+                            if pattern.matches(component_str) {
+                                info!("Excluding file: {} (path component '{}' matches pattern: {})", file_path, component_str, exclude_pattern);
+                                return false;
                             }
                         }
                     }
                 }
-                // Also check if the filename matches the pattern directly
+                
+                // Check if the filename matches the pattern directly
                 if let Some(filename) = Path::new(file_path).file_name() {
                     if let Some(filename_str) = filename.to_str() {
-                        if glob::Pattern::new(exclude_pattern).map_or(false, |p| p.matches(filename_str)) {
-                            info!("Excluding file: {} (filename matches pattern: {})", file_path, exclude_pattern);
-                            return false;
+                        if let Ok(pattern) = glob::Pattern::new(exclude_pattern) {
+                            if pattern.matches(filename_str) {
+                                info!("Excluding file: {} (filename matches pattern: {})", file_path, exclude_pattern);
+                                return false;
+                            }
                         }
                     }
                 }
@@ -344,6 +360,57 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Remove duplicates from expanded_input_files
     expanded_input_files.sort();
     expanded_input_files.dedup();
+    
+    // Filter out excluded files
+    if !args.exclude_patterns.is_empty() {
+        let original_count = expanded_input_files.len();
+        expanded_input_files.retain(|file_path| {
+            for exclude_pattern in &args.exclude_patterns {
+                // Check if the file path contains the exclude pattern as a substring
+                if file_path.contains(exclude_pattern) {
+                    info!("Excluding file: {} (path contains pattern: {})", file_path, exclude_pattern);
+                    return false;
+                }
+                
+                // Check if the exclude pattern matches as a glob pattern against the full path
+                if let Ok(pattern) = glob::Pattern::new(exclude_pattern) {
+                    if pattern.matches(file_path) {
+                        info!("Excluding file: {} (path matches glob pattern: {})", file_path, exclude_pattern);
+                        return false;
+                    }
+                }
+                
+                // Check if any component of the path matches the pattern
+                for component in Path::new(file_path).components() {
+                    if let Some(component_str) = component.as_os_str().to_str() {
+                        if let Ok(pattern) = glob::Pattern::new(exclude_pattern) {
+                            if pattern.matches(component_str) {
+                                info!("Excluding file: {} (path component '{}' matches pattern: {})", file_path, component_str, exclude_pattern);
+                                return false;
+                            }
+                        }
+                    }
+                }
+                
+                // Check if the filename matches the pattern directly
+                if let Some(filename) = Path::new(file_path).file_name() {
+                    if let Some(filename_str) = filename.to_str() {
+                        if let Ok(pattern) = glob::Pattern::new(exclude_pattern) {
+                            if pattern.matches(filename_str) {
+                                info!("Excluding file: {} (filename matches pattern: {})", file_path, exclude_pattern);
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
+            true
+        });
+        let excluded_count = original_count - expanded_input_files.len();
+        if excluded_count > 0 {
+            info!("Excluded {} files based on exclude patterns", excluded_count);
+        }
+    }
     
     // Validate that either input_files or path_patterns are provided
     if expanded_input_files.is_empty() && args.path_patterns.is_empty() {
