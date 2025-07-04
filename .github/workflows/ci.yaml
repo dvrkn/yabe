@@ -22,5 +22,7 @@ jobs:
         run: cargo build --release
       - name: Cargo test
         run: cargo test
+      - name: Test examples
+        run: ./test-examples.sh
       - name: Check artifact weight
         run: ls -lh target/release/
