@@ -1,3 +1,4 @@
 ```bash
-yabe --sort-config-path ../sort-config.yaml --base-out-path ./out/values.yaml  ./in/values.yaml
+# With sort configuration
+yabe sort --sort-config ../config-example/sort-config.yaml -o ./out ./in/values.yaml
 ```

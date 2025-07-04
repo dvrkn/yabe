@@ -10,4 +10,3 @@ pub use diff::{compute_diff, diff_and_common_multiple};
 pub use cli::{Args, Commands};
 pub use commands::sort::run_sort_command;
 pub use commands::separate::run_separate_command;
-pub use commands::legacy::run_legacy_main;

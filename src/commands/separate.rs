@@ -8,8 +8,25 @@ use crate::diff::{compute_diff, diff_and_common_multiple};
 use crate::merge::merge_yaml;
 use crate::sorter::sort_yaml;
 use crate::utils::{expand_and_filter_files, ensure_output_dir};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize, Serialize)]
+struct SeparateConfig {
+    read_only_base: Option<String>,
+    base: Option<String>,
+    input_files: Option<Vec<String>>,
+    path_patterns: Option<Vec<String>>,
+    inplace: Option<bool>,
+    out_folder: Option<String>,
+    debug: Option<bool>,
+    quorum: Option<u8>,
+    base_out_path: Option<String>,
+    sort_config_path: Option<String>,
+    exclude_patterns: Option<Vec<String>>,
+}
 
 pub fn run_separate_command(
+    config_file: Option<String>,
     input_files: Vec<String>,
     path_patterns: Vec<String>,
     read_only_base: Option<String>,
@@ -23,10 +40,62 @@ pub fn run_separate_command(
 ) -> Result<(), Box<dyn Error>> {
     info!("Running separate command");
     
-    let expanded_input_files = expand_and_filter_files(input_files, &path_patterns, &exclude_patterns)?;
+    // Load config file if provided and merge with CLI arguments
+    let (final_input_files, final_path_patterns, final_read_only_base, final_base, final_quorum, 
+         final_base_out_path, final_sort_config_path, final_inplace, final_out_folder, final_exclude_patterns) = 
+        if let Some(config_path) = config_file {
+            info!("Loading configuration from file: {}", config_path);
+            let config_content = fs::read_to_string(&config_path)?;
+            let config: SeparateConfig = serde_yml::from_str(&config_content)?;
+            
+            // CLI arguments override config file values
+            let merged_input_files = if input_files.is_empty() { 
+                config.input_files.unwrap_or_default() 
+            } else { 
+                input_files 
+            };
+            let merged_path_patterns = if path_patterns.is_empty() { 
+                config.path_patterns.unwrap_or_default() 
+            } else { 
+                path_patterns 
+            };
+            let merged_read_only_base = read_only_base.or(config.read_only_base);
+            let merged_base = base.or(config.base);
+            let merged_quorum = if quorum == 51 { config.quorum.unwrap_or(51) } else { quorum };
+            let merged_base_out_path = if base_out_path == "./base.yaml" { 
+                config.base_out_path.unwrap_or_else(|| "./base.yaml".to_string()) 
+            } else { 
+                base_out_path 
+            };
+            let merged_sort_config_path = if sort_config_path == "./sort-config.yaml" { 
+                config.sort_config_path.unwrap_or_else(|| "./sort-config.yaml".to_string()) 
+            } else { 
+                sort_config_path 
+            };
+            let merged_inplace = if !inplace { config.inplace.unwrap_or(false) } else { inplace };
+            let merged_out_folder = if out_folder == "./out" { 
+                config.out_folder.unwrap_or_else(|| "./out".to_string()) 
+            } else { 
+                out_folder 
+            };
+            let merged_exclude_patterns = if exclude_patterns.is_empty() { 
+                config.exclude_patterns.unwrap_or_default() 
+            } else { 
+                exclude_patterns 
+            };
+            
+            (merged_input_files, merged_path_patterns, merged_read_only_base, merged_base, 
+             merged_quorum, merged_base_out_path, merged_sort_config_path, merged_inplace, 
+             merged_out_folder, merged_exclude_patterns)
+        } else {
+            (input_files, path_patterns, read_only_base, base, quorum, base_out_path, 
+             sort_config_path, inplace, out_folder, exclude_patterns)
+        };
+    
+    let expanded_input_files = expand_and_filter_files(final_input_files, &final_path_patterns, &final_exclude_patterns)?;
     
     // Validate that either input_files or path_patterns are provided
-    if expanded_input_files.is_empty() && path_patterns.is_empty() {
+    if expanded_input_files.is_empty() && final_path_patterns.is_empty() {
         eprintln!("Error: No input files or path patterns provided. Please specify either input files or path patterns.");
         std::process::exit(1);
     }
@@ -38,25 +107,26 @@ pub fn run_separate_command(
     }
 
     let input_filenames = expanded_input_files;
-    let quorum_percentage = (quorum as f64) / 100.0;
+    let quorum_percentage = (final_quorum as f64) / 100.0;
 
     // Ensure output directory exists
-    ensure_output_dir(&out_folder)?;
+    ensure_output_dir(&final_out_folder)?;
 
-    let config = if !sort_config_path.is_empty() {
-        info!("Reading sort configuration file: {}", sort_config_path);
-        let content = fs::read_to_string(&sort_config_path);
+    let config = if !final_sort_config_path.is_empty() {
+        info!("Reading sort configuration file: {}", final_sort_config_path);
+        let content = fs::read_to_string(&final_sort_config_path);
         if let Ok(content) = content {
             YamlLoader::load_from_str(&content)?.into_iter().next().unwrap_or(Yaml::Null)
         } else {
-            log::warn!("Failed to read sort configuration file: {}", sort_config_path);
+            log::warn!("Failed to read sort configuration file: {}", final_sort_config_path);
             Yaml::Null
         }
     } else {
+        info!("No sort configuration provided, will use default alphabetical sorting");
         Yaml::Null
     };
 
-    let read_only_base = if let Some(ref read_only_base) = read_only_base {
+    let read_only_base = if let Some(ref read_only_base) = final_read_only_base {
         info!("Reading helm values file: {}", read_only_base);
         let content = fs::read_to_string(read_only_base)?;
         YamlLoader::load_from_str(&content)?.into_iter().next()
@@ -65,7 +135,7 @@ pub fn run_separate_command(
     };
 
     // Read and parse the existing base file if provided
-    let existing_base = if let Some(ref base_path) = base {
+    let existing_base = if let Some(ref base_path) = final_base {
         info!("Reading existing base YAML file: {}", base_path);
         let content = fs::read_to_string(base_path)?;
         YamlLoader::load_from_str(&content)?.into_iter().next()
@@ -117,19 +187,15 @@ pub fn run_separate_command(
     let diffs_refs: Vec<&Yaml> = diffs.iter().map(|cow| cow.as_ref()).collect();
     info!(
         "Computing common base and per-file diffs among the diffs with quorum {}%.",
-        quorum
+        final_quorum
     );
     let (base, per_file_diffs) = diff_and_common_multiple(&diffs_refs, quorum_percentage);
 
     // Process the base YAML if it exists
     if let Some(base_yaml) = base {
-        let processed_yaml = if config != Yaml::Null {
-            sort_yaml(base_yaml.as_ref(), &config)
-        } else {
-            Cow::Borrowed(base_yaml.as_ref())
-        };
+        let processed_yaml = sort_yaml(base_yaml.as_ref(), &config);
 
-        info!("Writing base YAML to {}", base_out_path);
+        info!("Writing base YAML to {}", final_base_out_path);
         let mut out_str = String::new();
         {
             let mut emitter = YamlEmitter::new(&mut out_str);
@@ -137,22 +203,18 @@ pub fn run_separate_command(
         }
         out_str = out_str.trim_start_matches("---\n").to_string();
         out_str.push('\n');
-        fs::write(base_out_path.as_str(), out_str)?;
-        info!("Base YAML written to {}", base_out_path);
+        fs::write(final_base_out_path.as_str(), out_str)?;
+        info!("Base YAML written to {}", final_base_out_path);
     } else {
         info!("No base YAML to write.");
     }
 
     // Determine whether to write diffs to original files or new files
-    if inplace {
+    if final_inplace {
         info!("Inplace mode enabled. Modifying original files.");
         for (i, diff) in per_file_diffs.iter().enumerate() {
             if let Some(diff_yaml) = diff {
-                let processed_diff = if config != Yaml::Null {
-                    sort_yaml(diff_yaml.as_ref(), &config)
-                } else {
-                    Cow::Borrowed(diff_yaml.as_ref())
-                };
+                let processed_diff = sort_yaml(diff_yaml.as_ref(), &config);
 
                 info!("Writing diff back to original file: {}", input_filenames[i]);
                 let mut out_str = String::new();
@@ -181,11 +243,7 @@ pub fn run_separate_command(
         info!("Writing diffs to new files.");
         for (i, diff) in per_file_diffs.iter().enumerate() {
             if let Some(diff_yaml) = diff {
-                let processed_diff = if config != Yaml::Null {
-                    sort_yaml(diff_yaml.as_ref(), &config)
-                } else {
-                    Cow::Borrowed(diff_yaml.as_ref())
-                };
+                let processed_diff = sort_yaml(diff_yaml.as_ref(), &config);
 
                 info!("Writing diff for {} to new file.", input_filenames[i]);
                 let mut out_str = String::new();
@@ -199,7 +257,7 @@ pub fn run_separate_command(
                     .file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("diff");
-                let diff_filename = format!("{}/{}_diff.yaml", out_folder, file_stem);
+                let diff_filename = format!("{}/{}_diff.yaml", final_out_folder, file_stem);
                 out_str = out_str.trim_start_matches("---\n").to_string();
                 out_str.push('\n');
                 fs::write(&diff_filename, out_str)?;

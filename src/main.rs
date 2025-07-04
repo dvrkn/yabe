@@ -1,6 +1,6 @@
 use std::error::Error;
 use clap::Parser;
-use yabe::{Args, Commands, run_sort_command, run_separate_command, run_legacy_main};
+use yabe::{Args, Commands, run_sort_command, run_separate_command};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
@@ -13,17 +13,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     match args.command {
-        Some(Commands::Sort { 
+        Commands::Sort { 
             input_files, 
             path_patterns, 
             sort_config_path, 
             inplace, 
             out_folder, 
             exclude_patterns 
-        }) => {
+        } => {
             run_sort_command(input_files, path_patterns, sort_config_path, inplace, out_folder, exclude_patterns)
         }
-        Some(Commands::Separate { 
+        Commands::Separate { 
+            config_file,
             input_files, 
             path_patterns, 
             read_only_base, 
@@ -34,12 +35,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             inplace, 
             out_folder, 
             exclude_patterns 
-        }) => {
-            run_separate_command(input_files, path_patterns, read_only_base, base, quorum, base_out_path, sort_config_path, inplace, out_folder, exclude_patterns)
-        }
-        None => {
-            // Legacy mode - use the existing logic
-            run_legacy_main(args)
+        } => {
+            run_separate_command(config_file, input_files, path_patterns, read_only_base, base, quorum, base_out_path, sort_config_path, inplace, out_folder, exclude_patterns)
         }
     }
 }

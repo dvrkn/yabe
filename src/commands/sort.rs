@@ -30,14 +30,10 @@ pub fn run_sort_command(
         let content = fs::read_to_string(&sort_config_path)?;
         YamlLoader::load_from_str(&content)?.into_iter().next().unwrap_or(Yaml::Null)
     } else {
-        eprintln!("Error: Sort configuration file is required but not found: {}", sort_config_path);
-        std::process::exit(1);
+        info!("No sort configuration provided, will use default alphabetical sorting");
+        Yaml::Null
     };
 
-    if sort_config == Yaml::Null {
-        eprintln!("Error: Sort configuration file is empty or invalid: {}", sort_config_path);
-        std::process::exit(1);
-    }
 
     // Ensure output directory exists if not in-place mode
     if !inplace {
