@@ -1,3 +1,5 @@
+set -eo pipefail
+
 for dir in examples/*/; do
     echo "Running tests in $dir"
     (cd "$dir" && make test)
