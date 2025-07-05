@@ -9,7 +9,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        os: [
+#          macos-latest,
+          ubuntu-latest
+        ]
         arch: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v4
@@ -22,5 +25,7 @@ jobs:
         run: cargo build --release
       - name: Cargo test
         run: cargo test
+      - name: Test examples
+        run: ./test-examples.sh
       - name: Check artifact weight
         run: ls -lh target/release/

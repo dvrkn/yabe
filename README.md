@@ -4,14 +4,14 @@ YABE is a tool designed to help manage large amounts of YAML files in a GitOps e
 
 ## Features
 
-- **Compute diffs:** Detect differences between YAML files.
+- **Compute diffs:** Detect differences between YAML files using the `separate` command.
 - **Merge YAML files:** Combine YAML files with a base YAML, either from an existing file or dynamically computed.
 - **Quorum-based diffing:** Extract common base YAML based on a quorum percentage.
-- **Sort YAML content:** Sort keys in YAML files based on user-defined configuration.
-- **Sort-only mode:** Sort YAML files without performing any diffing operations.
+- **Sort YAML content:** Sort keys in YAML files based on user-defined configuration or alphabetically using the `sort` command.
 - **Helm Values Integration:** Merge input YAML files with Helm values files.
 - **In-place modification or output to new files.**
-- **Configuration File Support:** Run the tool using a configuration file to simplify usage in automated workflows.
+- **Flexible file selection:** Support for glob patterns and exclude patterns.
+- **Command-based interface:** Clean separation between sorting and diffing operations.
 
 ## Installation
 
@@ -21,43 +21,80 @@ cargo install yabe-gitops
 
 ## Usage
 
+YABE now uses subcommands to organize its functionality. Run `yabe --help` to see available commands:
+
 ```bash
-Usage: yabe [OPTIONS] [INPUT_FILES]...
+Usage: yabe [OPTIONS] <COMMAND>
+
+Commands:
+  sort      Sort YAML files based on configuration
+  separate  Separate common base from YAML files (diff/rebalance)
+  help      Print this message or the help of the given subcommand(s)
+
+Options:
+      --debug   Enable debug logging
+  -h, --help    Print help
+  -V, --version Print version
+```
+
+### Sort Command
+
+Sort YAML files based on configuration:
+
+```bash
+Usage: yabe sort [OPTIONS] [INPUT_FILES]...
 
 Arguments:
   [INPUT_FILES]...  Input YAML files (optional if path patterns are provided)
 
 Options:
-  -r, --read-base <READ_BASE>                (Optional) Read-only base for values deduplication
-  -b, --base <WRITE_BASE>                    (Optional) Common values of all input files, if not provided, will be computed
-  -p, --path-pattern <PATH_PATTERN>          Path patterns to load YAML files (e.g., "*.yaml")
-  -i, --in-place                             Modify the original input files with diffs
-  -o, --out <OUT_FOLDER>                     Output folder for diff files [default: ./out]
-      --debug                                Enable debug logging
-  -q, --quorum <QUORUM>                      Quorum percentage (0-100) [default: 51]
-      --base-out-path <BASE_OUT_PATH>        (Optional) Base file output path [default: ./base.yaml]
-      --sort-config-path <SORT_CONFIG_PATH>  (Optional) Sort configuration file path [default: ./sort-config.yaml], if not provided, will not sort
-      --sort-only                            Sort only mode - only sort files without diffing
-      --exclude <EXCLUDE_PATTERN>            Exclude patterns to skip files (e.g., "*.terraform.yaml")
-      --config <CONFIG_FILE>                 (Optional) Configuration file
-  -h, --help                                 Print help
-  -V, --version                              Print version
+  -p, --path-pattern <PATH_PATTERN>     Path patterns to load YAML files (e.g., "*.yaml")
+      --sort-config <SORT_CONFIG_PATH>  Sort configuration file path [default: ./sort-config.yaml]
+  -i, --in-place                        Modify the original input files with sorted content
+  -o, --out <OUT_FOLDER>                Output folder [default: ./out]
+      --exclude <EXCLUDE_PATTERN>       Exclude patterns to skip files (e.g., "*.terraform.yaml")
+  -h, --help                            Print help
+```
+
+### Separate Command
+
+Separate common base from YAML files (diff/rebalance):
+
+```bash
+Usage: yabe separate [OPTIONS] [INPUT_FILES]...
+
+Arguments:
+  [INPUT_FILES]...  Input YAML files (optional if path patterns are provided)
+
+Options:
+  -p, --path-pattern <PATH_PATTERN>     Path patterns to load YAML files (e.g., "*.yaml")
+  -r, --read-base <READ_BASE>           Helm chart values file
+  -b, --base <WRITE_BASE>               Base YAML file to merge with input files
+  -q, --quorum <QUORUM>                 Quorum percentage (0-100) [default: 51]
+      --base-out <BASE_OUT_PATH>        Base file output path [default: ./base.yaml]
+      --sort-config <SORT_CONFIG_PATH>  Sort configuration file path [default: ./sort-config.yaml]
+  -i, --in-place                        Modify the original input files with diffs
+  -o, --out <OUT_FOLDER>                Output folder [default: ./out]
+      --exclude <EXCLUDE_PATTERN>       Exclude patterns to skip files (e.g., "*.terraform.yaml")
+  -h, --help                            Print help
 ```
 
 **Note:** You must provide either input files or path patterns. If both are provided, all matching files will be processed.
 
 ### Basic Usage
 
-Run the tool with the YAML override files:
+#### Separating Common Base from YAML Files
+
+Run the separate command with the YAML override files:
 
 ```bash
-./yabe file1.yaml file2.yaml file3.yaml
+yabe separate file1.yaml file2.yaml file3.yaml
 ```
 
 Or use path patterns to load multiple files:
 
 ```bash
-./yabe -p "*.yaml" -p "configs/*.yaml"
+yabe separate -p "*.yaml" -p "configs/*.yaml"
 ```
 
 This will compute the differences among the override files and generate:
@@ -65,48 +102,51 @@ This will compute the differences among the override files and generate:
 * base.yaml: The common base configuration.
 * file1_diff.yaml, file2_diff.yaml, file3_diff.yaml: The differences for each file.
 
-### In-place Modification
+#### In-place Modification
 
 Use the -i or --in-place flag to modify the original override files with their differences:
 ```bash
-./yabe -i -r helm_values.yaml file1.yaml file2.yaml file3.yaml
+yabe separate -i -r helm_values.yaml file1.yaml file2.yaml file3.yaml
 ```
 
-### Enable Debug Logging
+#### Enable Debug Logging
 
 Use the --debug flag to enable detailed debug logging:
 ```bash
-./yabe --debug -r helm_values.yaml file1.yaml file2.yaml file3.yaml
+yabe --debug separate -r helm_values.yaml file1.yaml file2.yaml file3.yaml
 ```
 
-### Sort Only Mode
+#### Sort YAML Files
 
-Use the --sort-only flag to only sort YAML files without performing any diffing operations:
+Use the sort command to sort YAML files based on configuration:
 
 ```bash
 # Sort files and output to ./out directory
-./yabe --sort-only --sort-config-path sort-config.yaml file1.yaml file2.yaml
+yabe sort --sort-config sort-config.yaml file1.yaml file2.yaml
 
 # Sort files in-place (modify original files)
-./yabe --sort-only --sort-config-path sort-config.yaml -i file1.yaml file2.yaml
+yabe sort --sort-config sort-config.yaml -i file1.yaml file2.yaml
 
 # Sort files using path patterns
-./yabe --sort-only --sort-config-path sort-config.yaml -p "*.yaml" -p "configs/*.yaml"
+yabe sort --sort-config sort-config.yaml -p "*.yaml" -p "configs/*.yaml"
 
 # Sort files to a specific output directory
-./yabe --sort-only --sort-config-path sort-config.yaml -o ./sorted-files *.yaml
+yabe sort --sort-config sort-config.yaml -o ./sorted-files *.yaml
 
 # Sort files recursively while excluding certain patterns
-./yabe --sort-only --sort-config-path sort-config.yaml -p "**/*.yaml" --exclude "*.terraform.yaml" --exclude "*-template.yaml"
+yabe sort --sort-config sort-config.yaml -p "**/*.yaml" --exclude "*.terraform.yaml" --exclude "*-template.yaml"
 
 # Sort files in-place while excluding terraform files
-./yabe --sort-only --sort-config-path sort-config.yaml -p "./envs/**/*.yaml" --exclude "*.terraform.yaml" -i
+yabe sort --sort-config sort-config.yaml -p "./envs/**/*.yaml" --exclude "*.terraform.yaml" -i
 
 # Exclude files by directory name (any file with "target" in the path)
-./yabe --sort-only --sort-config-path sort-config.yaml -p "**/*.yaml" --exclude "target"
+yabe sort --sort-config sort-config.yaml -p "**/*.yaml" --exclude "target"
 
 # Exclude multiple patterns - files in build directories and temp files
-./yabe --sort-only --sort-config-path sort-config.yaml -p "**/*.yaml" --exclude "target" --exclude "build" --exclude "*.tmp"
+yabe sort --sort-config sort-config.yaml -p "**/*.yaml" --exclude "target" --exclude "build" --exclude "*.tmp"
+
+# Sort files with alphabetical ordering (when no sort config is available)
+yabe sort file1.yaml file2.yaml  # Will apply default alphabetical sorting
 ```
 
 ### Exclude Patterns
@@ -142,51 +182,16 @@ The `--exclude` option supports flexible pattern matching to skip unwanted files
 
 **Examples:**
 ```bash
-# Exclude multiple directory types
-./yabe -p "**/*.yaml" --exclude "target" --exclude "node_modules" --exclude ".git"
+# Exclude multiple directory types (separate command)
+yabe separate -p "**/*.yaml" --exclude "target" --exclude "node_modules" --exclude ".git"
 
-# Exclude by file patterns and directories
-./yabe -p "**/*.yaml" --exclude "*.terraform.yaml" --exclude "build" --exclude "dist"
+# Exclude by file patterns and directories (separate command)
+yabe separate -p "**/*.yaml" --exclude "*.terraform.yaml" --exclude "build" --exclude "dist"
 
-# Complex exclusion for GitOps environments
-./yabe --sort-only -p "**/*.yaml" --exclude "target" --exclude ".argocd" --exclude "*.secret.yaml"
+# Complex exclusion for GitOps environments (sort command)
+yabe sort -p "**/*.yaml" --exclude "target" --exclude ".argocd" --exclude "*.secret.yaml"
 ```
 
-### Using Configuration File
-
-You can also use a configuration file to specify options:
-
-```yaml
-# config.yaml
-read_only_base: "path/to/read_only_base.yaml"
-base: "path/to/base.yaml"
-# Either input_files or path_patterns/path_pattern (or both) must be specified
-input_files:
-  - "input1.yaml"
-  - "input2.yaml"
-# You can use either path_patterns (array) or path_pattern (single string)
-path_patterns:
-  - "*.yaml"
-  - "configs/*.yaml"
-# OR
-# path_pattern: "*.yaml"
-inplace: true
-out_folder: "./output"
-debug: false
-quorum: 60
-base_out_path: "./base_output.yaml"
-sort_config_path: "./sort_config.yaml"
-sort_only: false  # Set to true for sort-only mode
-exclude_patterns:  # Optional: patterns to exclude from sorting
-  - "*.terraform.yaml"
-  - "*-template.yaml"
-```
-
-Then run the tool with:
-
-```bash
-./yabe --config config.yaml
-```
 
 ## Examples
 
@@ -235,7 +240,7 @@ settings:
 ### Running the Tool
     
 ```bash
-./yabe -r helm_values.yaml file1.yaml file2.yaml file3.yaml
+yabe separate -r helm_values.yaml file1.yaml file2.yaml file3.yaml
 ```
 
 ### Expected Output
@@ -268,7 +273,7 @@ settings:
 ### In-place Modification Example
 Running with the -i flag:
 ```bash
-./yabe -i -r helm_values.yaml file1.yaml file2.yaml file3.yaml
+yabe separate -i -r helm_values.yaml file1.yaml file2.yaml file3.yaml
 ```
 
 ## Testing

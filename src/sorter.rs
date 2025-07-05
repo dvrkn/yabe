@@ -13,7 +13,13 @@ pub fn sort_yaml<'a>(doc: &'a Yaml, config: &Yaml) -> Cow<'a, Yaml> {
                 }
                 Cow::Owned(Yaml::Array(new_v))
             } else {
-                Cow::Borrowed(doc)
+                // Recursively sort nested structures even without array config
+                let mut new_v = v.clone();
+                for x in &mut new_v {
+                    let sorted = sort_yaml(x, config);
+                    *x = sorted.into_owned();
+                }
+                Cow::Owned(Yaml::Array(new_v))
             }
         }
         Yaml::Hash(h) => {
@@ -30,7 +36,14 @@ pub fn sort_yaml<'a>(doc: &'a Yaml, config: &Yaml) -> Cow<'a, Yaml> {
                 }
                 Cow::Owned(Yaml::Hash(new_h))
             } else {
-                Cow::Borrowed(doc)
+                // Apply alphabetical sorting by default when no config is provided
+                let mut new_h = h.clone();
+                hash_sorter(&mut new_h, &[]); // Empty pre_order will just sort alphabetically
+                for (_, v) in &mut new_h {
+                    let sorted = sort_yaml(v, config);
+                    *v = sorted.into_owned();
+                }
+                Cow::Owned(Yaml::Hash(new_h))
             }
         }
         _ => Cow::Borrowed(doc),
