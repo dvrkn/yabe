@@ -182,18 +182,40 @@ pub fn diff_and_common_multiple<'a>(
             // Recursively process the values at this key
             let (sub_base, sub_diffs) = diff_and_common_multiple(&values_at_key, quorum);
 
-            if let Some(ref sub_base_val) = sub_base {
+            let base_includes_key = sub_base.is_some();
+
+            if let Some(sub_base_val) = sub_base {
                 // Base value meets quorum
-                base_hash.insert((*key).clone(), sub_base_val.clone().into_owned());
+                base_hash.insert((*key).clone(), sub_base_val.into_owned());
                 has_base = true;
             }
-
-            let base_includes_key = sub_base.is_some();
 
             for (i, sub_diff) in sub_diffs.into_iter().enumerate() {
                 if let Some(sub_diff_val) = sub_diff {
                     if !sub_diff_val.is_null() || base_includes_key {
                         diffs[i].insert((*key).clone(), sub_diff_val.into_owned());
+                        has_diffs[i] = true;
+                    }
+                }
+            }
+        }
+
+        // Empty hashes contribute no keys above, so without special handling
+        // they would vanish from both the base and the diffs. Treat the empty
+        // hash like an atomic value: it becomes the base when enough files
+        // agree on it, otherwise each empty-hash file keeps `{}` in its diff.
+        let empty_count = objs
+            .iter()
+            .filter(|obj| matches!(obj, Yaml::Hash(h) if h.is_empty()))
+            .count();
+        if empty_count > 0 {
+            if !has_base && empty_count >= quorum_count {
+                debug!("Empty hash meets the quorum; using it as base.");
+                has_base = true;
+            } else {
+                for (i, obj) in objs.iter().enumerate() {
+                    if matches!(obj, Yaml::Hash(h) if h.is_empty()) && !has_diffs[i] {
+                        debug!("Preserving empty hash in diff for object {}.", i);
                         has_diffs[i] = true;
                     }
                 }
