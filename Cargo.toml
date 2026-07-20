@@ -16,6 +16,17 @@ path = "src/main.rs"
 name = "yabe"
 path = "src/lib.rs"
 
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "core_benches"
+harness = false
+
+[[bench]]
+name = "alloc_benches"
+harness = false
+
 [dependencies]
 clap = { version = "4.5.40", features = ["derive"] }
 env_logger = "0.11.8"
