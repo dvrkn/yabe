@@ -2,38 +2,47 @@ use yaml_rust2::yaml::{Array, Hash, Yaml};
 use std::borrow::Cow;
 
 pub fn sort_yaml<'a>(doc: &'a Yaml, config: &Yaml) -> Cow<'a, Yaml> {
+    let sort_key = config["sortKey"].as_str();
+    let pre_order: Option<Vec<&str>> = config["preOrder"]
+        .as_vec()
+        .map(|v| v.iter().filter_map(|x| x.as_str()).collect());
+
+    // Clone the document once and sort in place; cloning per recursion level
+    // would make allocation scale with tree depth.
+    match doc {
+        Yaml::Array(_) if sort_key.is_some() => {
+            let mut owned = doc.clone();
+            sort_in_place(&mut owned, sort_key, pre_order.as_deref());
+            Cow::Owned(owned)
+        }
+        Yaml::Hash(_) if pre_order.is_some() => {
+            let mut owned = doc.clone();
+            sort_in_place(&mut owned, sort_key, pre_order.as_deref());
+            Cow::Owned(owned)
+        }
+        _ => Cow::Borrowed(doc),
+    }
+}
+
+fn sort_in_place(doc: &mut Yaml, sort_key: Option<&str>, pre_order: Option<&[&str]>) {
     match doc {
         Yaml::Array(v) => {
-            if let Some(sort_key) = config["sortKey"].as_str() {
-                let mut new_v = v.clone();
-                array_sorter(&mut new_v, sort_key);
-                for x in &mut new_v {
-                    let sorted = sort_yaml(x, config);
-                    *x = sorted.into_owned();
+            if let Some(key) = sort_key {
+                array_sorter(v, key);
+                for x in v {
+                    sort_in_place(x, sort_key, pre_order);
                 }
-                Cow::Owned(Yaml::Array(new_v))
-            } else {
-                Cow::Borrowed(doc)
             }
         }
         Yaml::Hash(h) => {
-            if let Some(pre_order_vec) = config["preOrder"].as_vec() {
-                let mut new_h = h.clone();
-                let pre_order = pre_order_vec
-                    .iter()
-                    .filter_map(|x| x.as_str())
-                    .collect::<Vec<&str>>();
-                hash_sorter(&mut new_h, &pre_order);
-                for (_, v) in &mut new_h {
-                    let sorted = sort_yaml(v, config);
-                    *v = sorted.into_owned();
+            if let Some(order) = pre_order {
+                hash_sorter(h, order);
+                for (_, v) in h {
+                    sort_in_place(v, sort_key, pre_order);
                 }
-                Cow::Owned(Yaml::Hash(new_h))
-            } else {
-                Cow::Borrowed(doc)
             }
         }
-        _ => Cow::Borrowed(doc),
+        _ => {}
     }
 }
 
