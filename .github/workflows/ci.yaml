@@ -6,11 +6,15 @@ on:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest]
-        arch: [x86_64, aarch64]
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    name: build (linux-${{ matrix.arch }})
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust
